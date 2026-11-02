@@ -80,6 +80,14 @@ Los métodos de motor y storage son async; `transcript()` devuelve una copia del
 El pipeline envía `EngineEvent` por silencio, límite duro o finalización voluntaria. El límite
 duro/finalización termina sin otra llamada LLM. `restore()` reconstruye el motor desde estado
 y turnos persistidos sin emitir audio; la API valida antes credencial y deadline original.
+El inicio de habla invalida respuestas pendientes mediante un epoch. Si la respuesta todavía
+no se entregó, el coordinador guarda el turno real del candidato y descarta el motor que ya
+pudo haber avanzado internamente. `InterviewEngineFactory` crea uno nuevo; `restore()` recibe
+la última fase, competencia y contador de repreguntas entregados, el deadline original y el
+transcript comprometido más ese turno real. Solo avanza el tiempo transcurrido. La pregunta
+generada pero no entregada nunca se incorpora al storage ni al motor restaurado. No hay
+aborto por una interrupción normal ni llamadas a proveedores al reconstruir. La persistencia
+y la reanudación deben usar el mismo checkpoint; un fallo de storage detiene la sesión.
 La API autoriza la sesión y crea un motor nuevo por entrevista. `SessionStore` hace cumplir
 consentimiento en escrituras de audio/turnos y en claim atómico. Un token de invitación de
 32 bytes aleatorios expira en siete días; solo su SHA-256 se guarda. El claim lo consume y

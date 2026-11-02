@@ -144,6 +144,21 @@ class InterviewEngine(Protocol):
     def transcript(self) -> list[Turn]: ...
 
 
+class InterviewEngineFactory(Protocol):
+    """Return a fresh, unstarted engine with the same provider configuration.
+
+    The coordinator serializes operations and retains the last delivered state.
+    If speech onset invalidates an awaited response before text delivery, persist
+    the real candidate turn, discard the mutated engine, and restore a fresh one
+    with the last delivered phase/competency/followup state, original deadline,
+    and committed transcript plus that candidate turn. Advance only elapsed time.
+    Never persist or restore the generated but undelivered interviewer question.
+    Rebuilding must not invoke providers or emit speech. Expired deadlines close
+    the session without creating a new engine/provider operation.
+    """
+    def __call__(self) -> InterviewEngine: ...
+
+
 class CompetencyScore(Contract):
     competency_id: str
     score: int | None = Field(default=None, ge=1, le=5, strict=True)

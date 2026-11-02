@@ -14,3 +14,14 @@ Las decisiones humanas nunca se reemplazan por una aprobación/rechazo automáti
 ## Consecuencias
 Motor y scoring se prueban sin red. Un LLM defectuoso no puede saltar fases ni fijar scores
 sin evidencia. Inyección, cortes y degradaciones son flags para revisión humana.
+
+## Enmienda: interrupción durante generación (2026-11-02)
+
+El motor puede mutar estado antes de esperar al LLM. Cancelarlo o simplemente silenciar su
+salida puede adelantar la competencia a una pregunta que el candidato nunca recibió.
+Se conserva un checkpoint de la última respuesta entregada. Ante barge-in antes de entrega,
+el coordinador persiste el turno real, descarta la instancia mutada y usa una factory para
+restaurar un motor nuevo con fase/repreguntas anteriores, tiempo actualizado y deadline
+original. No conserva el turno ficticio del entrevistador ni aborta una interrupción normal.
+La reconstrucción no usa proveedores. Tests del pipeline deben probar siguiente competencia,
+ambos turnos reales, ausencia de pregunta no entregada y límite duro sin nuevas llamadas.
