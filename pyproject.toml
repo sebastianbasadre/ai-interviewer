@@ -17,7 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 realtime = ["pipecat-ai==1.15.0"]
-test = ["pytest==9.2.0", "pytest-asyncio==1.4.1.post1"]
+test = ["pytest==9.2.0", "pytest-asyncio==1.4.1.post1", "httpx==0.28.1"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ai_interviewer"]
@@ -27,3 +27,4 @@ testpaths = ["tests"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 addopts = "-q"
+
