@@ -201,3 +201,86 @@ def test_opt_in_report_generation_validates_and_is_idempotent(setup):
         assert reporter.post(path, headers={"X-Admin-Key": "test-admin-key"}).json() == response.json()
         assert reporter.get(path, headers={"X-Admin-Key": "test-admin-key"}).json() == response.json()
     assert calls == [interview_id]
+
+async def test_watchdog_waiting_for_slow_start_reads_committed_snapshot(tmp_path):
+    import asyncio
+    import httpx
+
+    clock = Clock()
+    role = load_role(Path(__file__).resolve().parents[2] / "roles" / "pm_po.yaml")
+    settings = Settings(_env_file=None, data_dir=tmp_path, public_base_url="http://localhost", admin_api_key=SecretStr("test-admin-key"), ip_hash_secret=SecretStr("test-ip-secret"))
+    store = SQLiteSessionStore(tmp_path)
+    started, release = asyncio.Event(), asyncio.Event()
+
+    class SlowStart(Engine):
+        async def start(self, role, candidate):
+            started.set()
+            await release.wait()
+            return await super().start(role, candidate)
+
+    app = create_app(settings, {role.id: role}, SlowStart, privacy_contact="Equipo", store=store, clock=clock, watchdog_interval=3600)
+    try:
+        async with app.router.lifespan_context(app):
+            async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://localhost") as client:
+                created = await client.post("/admin/interviews", headers={"X-Admin-Key": "test-admin-key"}, json={"role_id": role.id, "name": "Candidato", "email": "a@b.test"})
+                data = created.json()
+                path = data["link"].replace("http://localhost", "")
+                await client.post(path + "/consent", json={"accepted": True})
+                pending_start = asyncio.create_task(client.post(path + "/start"))
+                await asyncio.wait_for(started.wait(), timeout=2)
+                pending_watchdog = asyncio.create_task(app.state.enforce_deadlines())
+                # Let watchdog inspect the claimed session and block behind start's lock.
+                await asyncio.sleep(0)
+                release.set()
+                response, _ = await asyncio.gather(pending_start, pending_watchdog)
+                assert response.status_code == 200
+                interview = await store.get(UUID(data["id"]))
+                assert interview.status == "active"
+                assert (await store.get_snapshot(interview.id)).state.phase == InterviewPhase.WARMUP
+                assert (await client.post(f"/session/{interview.id}/turn", json={"text": "Primera respuesta"})).status_code == 200
+    finally:
+        store.close()
+
+
+@pytest.mark.parametrize("failure", ["engine_error", "engine_timeout", "progress_error"])
+def test_finish_failure_closes_store_and_discards_mutated_engine(setup, monkeypatch, failure):
+    import asyncio
+    import gc
+    import weakref
+
+    client, _, store, clock, role, settings = setup
+    references = []
+
+    class FailedEnd(Engine):
+        async def on_event(self, event):
+            # Mutate first, as an actual engine may before a provider/storage failure.
+            decision = await super().on_event(event)
+            if failure == "engine_error":
+                raise RuntimeError("provider failed")
+            if failure == "engine_timeout":
+                await asyncio.Event().wait()
+            return decision
+
+    def factory():
+        engine = FailedEnd()
+        references.append(weakref.ref(engine))
+        return engine
+
+    app = create_app(settings, {role.id: role}, factory, privacy_contact="Equipo", store=store, clock=clock)
+    with TestClient(app, base_url="http://localhost") as failing:
+        interview_id, _, _ = begin(failing, role)
+        original = store.save_progress
+        if failure == "progress_error":
+            async def broken_progress(*args, **kwargs):
+                raise OSError("disk write failed")
+            monkeypatch.setattr(store, "save_progress", broken_progress)
+        response = failing.post(f"/session/{interview_id}/finish")
+        assert response.status_code == 503
+        assert "finalizó" in response.json()["detail"]
+        interview = failing.portal.call(store.get, interview_id)
+        assert interview.status == "aborted" and interview.ended_at == clock()
+        assert failing.post(f"/session/{interview_id}/turn", json={"text": "No continuar"}).status_code == 409
+        assert failing.post(f"/session/{interview_id}/finish").status_code == 409
+        monkeypatch.setattr(store, "save_progress", original)
+        gc.collect()
+        assert references and all(reference() is None for reference in references)

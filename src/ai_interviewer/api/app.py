@@ -106,12 +106,14 @@ def create_app(
     async def enforce_deadlines() -> None:
         """Also runs after process restart; client traffic cannot extend the deadline."""
         for interview in await repository.active():
-            snapshot = await repository.get_snapshot(interview.id)
-            if snapshot and clock() < snapshot.deadline:
-                continue
             async with locks.setdefault(interview.id, asyncio.Lock()):
                 current = await repository.get(interview.id)
                 if not current or current.status != "active":
+                    continue
+                # start() owns this lock until its first snapshot is committed. Read only
+                # after acquiring it: a pre-lock missing/expired snapshot can be stale.
+                snapshot = await repository.get_snapshot(interview.id)
+                if snapshot and clock() < snapshot.deadline:
                     continue
                 try:
                     if not snapshot:
@@ -344,12 +346,23 @@ def create_app(
         await authorize(request, interview_id)
         async with locks.setdefault(interview_id, asyncio.Lock()):
             interview = await authorize(request, interview_id)
-            engine, snapshot = await get_engine(interview)
-            decision = await asyncio.wait_for(engine.on_event(EngineEvent(kind="candidate_end", elapsed_seconds=max(0, (clock() - interview.started_at).total_seconds()))), timeout=2)
-            if not decision.end_session:
-                raise StorageError("candidate end must end session")
-            await persist(interview, engine, decision, snapshot.deadline)
-            return decision.model_dump(mode="json")
+            try:
+                engine, snapshot = await get_engine(interview)
+                decision = await asyncio.wait_for(engine.on_event(EngineEvent(kind="candidate_end", elapsed_seconds=max(0, (clock() - interview.started_at).total_seconds()))), timeout=2)
+                if not decision.end_session:
+                    raise StorageError("candidate end must end session")
+                await persist(interview, engine, decision, snapshot.deadline)
+                return decision.model_dump(mode="json")
+            except Exception:
+                # A request to stop must not leave a failed/mutated engine resumable.
+                # Preserve already committed evidence and close the storage record even
+                # when the final engine event or progress write failed.
+                current = await repository.get(interview_id)
+                if current and current.status == "active":
+                    await repository.finish(interview_id, clock(), aborted=True)
+                raise HTTPException(503, "La entrevista finalizó por un problema técnico. El equipo humano podrá revisar las respuestas guardadas.") from None
+            finally:
+                engines.pop(interview_id, None)
 
     @app.post("/session/{interview_id}/survey")
     async def survey(interview_id: UUID, body: Survey, request: Request):
