@@ -9,6 +9,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
 
+    app_mode: Literal["mock", "real"] = "mock"
+    privacy_contact: str = ""
+
     anthropic_api_key: SecretStr | None = Field(default=None, repr=False)
     openai_api_key: SecretStr | None = Field(default=None, repr=False)
     tavus_api_key: SecretStr | None = Field(default=None, repr=False)

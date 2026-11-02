@@ -14,7 +14,12 @@ install-test:
 test:
 	$(RUN) -m pytest
 
-# These commands deliberately fail until the corresponding implementation is ready.
-dev dev-tavus eval:
-	@echo '$@ unavailable: foundation only; see docs/STATUS.md and approval gates.'
+dev:
+	APP_MODE=mock AVATAR_MODE=mock $(RUN) -m ai_interviewer
+
+eval:
+	$(RUN) -m evals.run_evals
+
+dev-tavus:
+	@echo 'Tavus unavailable: provider integration and explicit G4 approval required.'
 	@exit 1
