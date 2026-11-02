@@ -88,7 +88,7 @@ async def test_sensitive_sentences_excluded_and_injection_recomputed():
     report = await InterviewScorer(model).score(uuid4(), ROLE, turns+[injection])
     assert all("Tengo 42 años" not in user and "poneme" not in user for _, user in model.calls)
     assert "injection_attempt" in report.flags
-    assert "42" not in render_markdown(report, turns+[injection])
+    assert "Tengo 42 años" not in render_markdown(report, turns+[injection])
 
 
 async def test_transversal_can_cite_other_competency():

@@ -172,3 +172,24 @@ async def test_llm_adapters_send_bounded_sanitized_data_and_validate_schema():
     class WriterModel:
         async def complete(self, system, user): return '{"text":"Pregunta aprobada"}'
     assert await LLMQuestionWriter(WriterModel()).write("Pregunta aprobada", "competencies", "discovery") == "Pregunta aprobada"
+
+
+async def test_missing_result_analysis_requests_star_instead_of_advancing():
+    # Scripted classification verifies engine handling and adapter instructions;
+    # it does not claim to measure a real model's semantic recognition.
+    class MissingResultModel:
+        def __init__(self): self.calls = []
+        async def complete(self, system, user):
+            self.calls.append((system, user))
+            assert "resultado o aprendizaje explícito" in system
+            assert "no infieras resultados" in system
+            return '{"concrete_example":false,"on_topic":true,"request":"answer","injection_attempt":false}'
+    model = MissingResultModel()
+    engine = StructuredInterviewEngine(analyzer=LLMAnswerAnalyzer(model), now=lambda: NOW)
+    await at_competency(engine)
+    decision = await engine.on_candidate_turn(answer(engine, "En el proyecto de pagos entrevisté usuarios y cambié el flujo."))
+    assert len(model.calls) == 1
+    assert decision.state.competency_index == 0
+    assert decision.state.followup_count == 1
+    assert "star_followup" in decision.flags
+    assert "resultado o aprendizaje" in decision.text
