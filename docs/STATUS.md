@@ -1,7 +1,7 @@
 # Estado del proyecto
 
 ## Fase actual
-Fase 0 preparada salvo credenciales; G1 aprobado por el responsable; fase 2 pausada en G2 para revisión experta del guion y rúbrica.
+Fase 0 preparada salvo credenciales; G1 aprobado por el responsable; G2 aprobado por el responsable; fase 2 en construcción.
 
 ## Tareas
 - [x] Leer CLAUDE.md, README, prompt del orquestador y siete agentes.
@@ -14,7 +14,7 @@ Fase 0 preparada salvo credenciales; G1 aprobado por el responsable; fase 2 paus
 - [x] make test en homelab: 15 passed (Python 3.12.16).
 - [x] Revisión independiente: APROBAR; eventos de motor y restauración de snapshot corregidos.
 - [x] G1: aprobado por el responsable (OK).
-- [ ] G2: roles/pm_po.yaml listo; revisión técnica APROBAR y 19 tests correctos en homelab. Pendiente revisión experta del responsable antes de motor/scoring.
+- [x] G2: guion y rúbrica PM/PO aprobados por el responsable (SI), con revisión técnica APROBAR y 19 tests correctos.
 - [ ] API/storage y pipeline mock en ramas aisladas; integrar solo tras tests y APROBAR.
 
 ## Decisiones
@@ -25,7 +25,7 @@ Fase 0 preparada salvo credenciales; G1 aprobado por el responsable; fase 2 paus
 - Arquitectura integrada por fast-forward tras tests, APROBAR y G1. Fase 2 en ramas feat/interview-engine-role, feat/web-api-pilot y feat/pipeline-mock.
 
 ## Pendientes
-G2 guion/rúbrica; G3 evals pagas; G4 Tavus; G5 piloto real.
+G3 evals pagas; G4 Tavus; G5 piloto real.
 La GPU es visible desde WSL; compatibilidad efectiva Whisper/CUDA aún no verificada.
 
 
@@ -33,5 +33,6 @@ La GPU es visible desde WSL; compatibilidad efectiva Whisper/CUDA aún no verifi
 Retención propuesta de 30 días conservada. Video persistido pendiente de definición; no implementarlo aún.
 
 
-Checkpoints fase 2: web/API y pipeline en worktrees aislados, sin integrar ni declarar completos. Pausados al presentar G2.
+Checkpoints fase 2: web/API y pipeline en worktrees aislados, sin integrar ni declarar completos. Retomados tras aprobación de G2.
+
 
