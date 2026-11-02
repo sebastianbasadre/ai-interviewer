@@ -1,7 +1,7 @@
 # Estado del proyecto
 
 ## Fase actual
-Fase 0 preparada salvo credenciales; fase 1 completada, revisada y pendiente de G1. No iniciar construcción antes de G1.
+Fase 0 preparada salvo credenciales; G1 aprobado por el responsable; fase 2 en construcción con tres worktrees aislados.
 
 ## Tareas
 - [x] Leer CLAUDE.md, README, prompt del orquestador y siete agentes.
@@ -13,17 +13,22 @@ Fase 0 preparada salvo credenciales; fase 1 completada, revisada y pendiente de 
 - [x] Arquitectura, contratos, ADRs, configuración, Makefile y CI (architect).
 - [x] make test en homelab: 15 passed (Python 3.12.16).
 - [x] Revisión independiente: APROBAR; eventos de motor y restauración de snapshot corregidos.
-- [ ] G1: aprobación del responsable antes de fase 2.
+- [x] G1: aprobado por el responsable (OK).
+- [ ] G2: guion y rúbrica PM/PO para revisión humana antes de motor/scoring.
+- [ ] API/storage y pipeline mock en ramas aisladas; integrar solo tras tests y APROBAR.
 
 ## Decisiones
 - El responsable indicó que el equipo de ejecución es homelab 192.168.2.6 por SSH, no la PC local.
 - Mantener stack y Python 3.12; ejecutar Linux mediante WSL2 del homelab.
 - Avatar mock; no servicios pagos, evaluaciones reales ni contacto con candidatos.
 - Git requiere excepción safe.directory por propiedad SMB; se usa solo por comando, sin cambiar configuración global.
-- Rama de arquitectura: feat/architect-foundation. Sin merge ni push hasta pruebas y revisión.
+- Arquitectura integrada por fast-forward tras tests, APROBAR y G1. Fase 2 en ramas feat/interview-engine-role, feat/web-api-pilot y feat/pipeline-mock.
 
 ## Pendientes
-G1 arquitectura; G2 guion/rúbrica; G3 evals pagas; G4 Tavus; G5 piloto real.
+G2 guion/rúbrica; G3 evals pagas; G4 Tavus; G5 piloto real.
 La GPU es visible desde WSL; compatibilidad efectiva Whisper/CUDA aún no verificada.
 
+
+
+Retención propuesta de 30 días conservada. Video persistido pendiente de definición; no implementarlo aún.
 
