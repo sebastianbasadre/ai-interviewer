@@ -88,6 +88,13 @@ transcript comprometido más ese turno real. Solo avanza el tiempo transcurrido.
 generada pero no entregada nunca se incorpora al storage ni al motor restaurado. No hay
 aborto por una interrupción normal ni llamadas a proveedores al reconstruir. La persistencia
 y la reanudación deben usar el mismo checkpoint; un fallo de storage detiene la sesión.
+Si el inicio de habla ocurre durante la persistencia de una respuesta pendiente,
+`replace_progress()` restaura snapshot y transcript en una transacción: conserva todos
+los turnos reales del candidato y elimina solamente respuestas del entrevistador aún no
+entregadas. Exige consentimiento activo, ownership y deadline idéntico; no toca audio ni
+reportes. La entrega lógica ocurre cuando `output.text` acepta el mensaje para encolar,
+no constituye un acuse de reproducción del navegador. Antes de ese límite se puede revertir;
+después se conserva el turno visible/encolado y el barge-in corta únicamente audio pendiente.
 La API autoriza la sesión y crea un motor nuevo por entrevista. `SessionStore` hace cumplir
 consentimiento en escrituras de audio/turnos y en claim atómico. Un token de invitación de
 32 bytes aleatorios expira en siete días; solo su SHA-256 se guarda. El claim lo consume y
