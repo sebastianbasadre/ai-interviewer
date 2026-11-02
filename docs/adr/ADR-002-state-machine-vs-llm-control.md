@@ -1,6 +1,6 @@
 # ADR-002: fases controladas por código
 
-Estado: propuesto para G1. Fecha: 2026-11-02.
+Estado: aceptado en G1 por el responsable. Fecha: 2026-11-02.
 
 ## Contexto
 El screening debe cubrir las mismas seis competencias y resistir instrucciones del candidato.
@@ -14,3 +14,4 @@ Las decisiones humanas nunca se reemplazan por una aprobación/rechazo automáti
 ## Consecuencias
 Motor y scoring se prueban sin red. Un LLM defectuoso no puede saltar fases ni fijar scores
 sin evidencia. Inyección, cortes y degradaciones son flags para revisión humana.
+

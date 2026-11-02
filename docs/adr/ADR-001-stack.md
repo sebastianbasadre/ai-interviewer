@@ -1,6 +1,6 @@
 # ADR-001: stack del piloto
 
-Estado: propuesto para G1. Fecha: 2026-11-02.
+Estado: aceptado en G1 por el responsable. Fecha: 2026-11-02.
 
 ## Contexto
 Se necesita conversación de baja latencia con interrupciones y un piloto simple, según CLAUDE.md.
@@ -17,3 +17,4 @@ La ejecución real de Whisper en CUDA queda por verificar.
 Se separan dependencias de contratos/tests de runtime para permitir mocks sin GPU.
 Las APIs de Pipecat se verifican en código instalado y ejemplos oficiales antes de usarlas.
 No hay cambios de stack implícitos ni servicios pagos activados en esta fase.
+

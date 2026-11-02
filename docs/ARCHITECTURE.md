@@ -1,6 +1,6 @@
-# Arquitectura — propuesta G1
+# Arquitectura — base aprobada G1
 
-Estado: pendiente de aprobación del responsable. Piloto de screening PM/PO; la recomendación
+Estado: base aprobada por el responsable en G1; pendientes de alcance indicados al final. Piloto de screening PM/PO; la recomendación
 siempre se revisa por una persona. No contiene decisiones de contratación automáticas.
 
 ## Entorno y límites
@@ -157,3 +157,4 @@ no equivalen a un lock transitivo; se generará lock resuelto tras validar ese e
 2. Medir Whisper/CUDA en el homelab confirmado; GPU visible ya verificada.
 3. Confirmar alcance de grabación: audio separado; decidir si también se exige video persistido.
 4. Confirmar retención propuesta de 30 días y responsable/contacto de privacidad antes del piloto.
+

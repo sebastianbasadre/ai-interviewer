@@ -1,6 +1,6 @@
 # ADR-003: consentimiento y borrado del conjunto de datos
 
-Estado: propuesto para G1. Fecha: 2026-11-02.
+Estado: aceptado en G1 por el responsable. Fecha: 2026-11-02.
 
 ## Contexto
 Una entrevista contiene datos personales, audio y texto; el piloto necesita límites simples
@@ -18,3 +18,4 @@ respetar un registro de borrados al restaurar. No almacenar datos sensibles en l
 Storage necesita tests de consentimiento, concurrencia, retención y borrado de archivos.
 El piloto no comienza hasta documentar quién accede, proveedores, contacto, política de
 backups y aviso de IA. Grabación persistida de video queda pendiente de definición en G1.
+
