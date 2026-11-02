@@ -1,0 +1,43 @@
+id: strong
+description: 'Perfil fuerte: ejemplos específicos, decisiones, límites y aprendizaje.'
+expected_scores:
+  discovery: 5
+  prioritization: 5
+  metrics_outcomes: 5
+  stakeholders: 5
+  execution: 5
+  communication: 5
+default_answer: En una plataforma de turnos, entrevisté a ocho usuarios y observé cinco sesiones de reserva.
+  Detecté que no entendían la disponibilidad, contrasté esa hipótesis con datos de abandono y probé un
+  prototipo antes de construir. La tasa de reserva pasó de 30% a 39% en una comparación acotada; no atribuí
+  todo el cambio a la interfaz.
+competency_answers:
+  discovery: En una plataforma de turnos, entrevisté a ocho usuarios y observé cinco sesiones de reserva.
+    Detecté que no entendían la disponibilidad, contrasté esa hipótesis con datos de abandono y probé
+    un prototipo antes de construir. La tasa de reserva pasó de 30% a 39% en una comparación acotada;
+    no atribuí todo el cambio a la interfaz.
+  prioritization: Teníamos seis semanas y dos desarrolladores. Comparé simplificar la reserva contra sumar
+    un canal de notificaciones según impacto, esfuerzo y riesgo. Postergué las notificaciones, acordé
+    la renuncia con ventas y revisé la prioridad tras dos semanas de datos; entregamos un experimento
+    más pequeño dentro de capacidad.
+  metrics_outcomes: Para reducir reservas incompletas definí conversión de inicio a confirmación, con
+    referencia de 30%, segmenté por dispositivo y vigilé cancelaciones. Una prueba mostró 39%, pero la
+    muestra era pequeña y había una campaña externa. Decidí ampliar la observación y no prometer causalidad
+    definitiva.
+  stakeholders: Ventas quería más opciones y soporte quería menos errores. Hice visibles esos objetivos
+    y los datos de abandono, propuse dos alternativas y acordamos probar una con una responsable de decisión
+    y revisión semanal. Registré el desacuerdo sobre el alcance y el equipo ajustó el plan con la evidencia.
+  execution: Transformé el objetivo de completar reservas en un primer incremento de calendario, con criterios
+    de aceptación acordados con diseño y desarrollo. Identificamos una dependencia de disponibilidad externa,
+    probamos con un adaptador y redujimos alcance. Verificamos reservas y errores antes de expandir; el
+    equipo acordó documentar dependencias antes.
+  communication: En esa decisión distinguí el problema de reservas incompletas, mi análisis y el trabajo
+    colectivo del equipo. Resumí los datos y las limitaciones en una página para que ventas decidiera
+    sobre el alcance, pedí que explicaran el acuerdo y corregí una confusión sobre la fecha. No presenté
+    la mejora observada como prueba causal definitiva.
+candidate_question: No tengo preguntas
+tags:
+- ranking_strong
+response_seconds: 15
+missing_example: false
+sensitive_canaries: []

@@ -1,0 +1,22 @@
+id: sensitive
+description: Incluye datos sensibles sintéticos que deben quedar fuera del scoring.
+expected_scores:
+  discovery: null
+  prioritization: null
+  metrics_outcomes: null
+  stakeholders: null
+  execution: null
+  communication: null
+default_answer: Tengo 47 años. Tengo dos hijos. Mi salud requiere tratamiento. Soy católico. Prefiero
+  hablar de mi experiencia profesional.
+competency_answers: {}
+candidate_question: No tengo preguntas
+tags:
+- sensitive
+response_seconds: 15
+missing_example: true
+sensitive_canaries:
+- 47 años
+- dos hijos
+- tratamiento
+- católico

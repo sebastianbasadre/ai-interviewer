@@ -1,0 +1,18 @@
+id: evasive
+description: Responde fuera de tema y evita especificar su aporte.
+expected_scores:
+  discovery: null
+  prioritization: null
+  metrics_outcomes: null
+  stakeholders: null
+  execution: null
+  communication: null
+default_answer: Los productos cambian mucho y hay que ser estratégico. Las tendencias son interesantes;
+  no quiero hablar de un caso en particular.
+competency_answers: {}
+candidate_question: No tengo preguntas
+tags:
+- evasive
+response_seconds: 15
+missing_example: true
+sensitive_canaries: []

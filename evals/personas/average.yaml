@@ -1,0 +1,19 @@
+id: average
+description: 'Perfil promedio: caso concreto y razonamiento básico sin gran contraste.'
+expected_scores:
+  discovery: 3
+  prioritization: 3
+  metrics_outcomes: 3
+  stakeholders: 3
+  execution: 3
+  communication: 3
+default_answer: En un proyecto de reservas, recibimos reclamos por errores. Revisé tickets, propuse simplificar
+  un paso con el equipo y acordamos qué entregar primero. Después observé menos tickets, aunque no aislamos
+  el efecto de otros cambios.
+competency_answers: {}
+candidate_question: No tengo preguntas
+tags:
+- ranking_average
+response_seconds: 15
+missing_example: false
+sensitive_canaries: []

@@ -1,0 +1,17 @@
+id: nervous
+description: Vacilaciones y pedidos de aclaración; sin evaluar voz ni emociones.
+expected_scores:
+  discovery: null
+  prioritization: null
+  metrics_outcomes: null
+  stakeholders: null
+  execution: null
+  communication: null
+default_answer: ¿Podés repetir la pregunta? Prefiero tomarme un momento para recordar un ejemplo.
+competency_answers: {}
+candidate_question: No tengo preguntas
+tags:
+- nervous
+response_seconds: 15
+missing_example: true
+sensitive_canaries: []

@@ -1,0 +1,17 @@
+id: monosyllabic
+description: Respuestas mínimas sin evidencia.
+expected_scores:
+  discovery: null
+  prioritization: null
+  metrics_outcomes: null
+  stakeholders: null
+  execution: null
+  communication: null
+default_answer: Sí.
+competency_answers: {}
+candidate_question: No tengo preguntas
+tags:
+- monosyllabic
+response_seconds: 15
+missing_example: true
+sensitive_canaries: []
