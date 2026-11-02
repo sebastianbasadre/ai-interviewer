@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling==1.33.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ai-interviewer"
+version = "0.1.0"
+description = "Structured AI screening interviews with human review"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "pydantic==2.14.2",
+  "pydantic-settings==2.16.2",
+  "fastapi==0.162.0",
+  "uvicorn==0.54.0",
+  "PyYAML==6.0.3",
+]
+
+[project.optional-dependencies]
+realtime = ["pipecat-ai==1.15.0"]
+test = ["pytest==9.2.0", "pytest-asyncio==1.4.1.post1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_interviewer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-q"
