@@ -1,0 +1,19 @@
+id: english_switch
+description: Cambia a inglés al entrar a competencias.
+expected_scores:
+  discovery: 3
+  prioritization: 3
+  metrics_outcomes: 3
+  stakeholders: 3
+  execution: 3
+  communication: 3
+default_answer: In a booking project, I reviewed support tickets and proposed simplifying the first step.
+  I agreed on scope with the team and checked the change in completion. The result improved, but we did
+  not isolate every external factor.
+competency_answers: {}
+candidate_question: No tengo preguntas
+tags:
+- english_switch
+response_seconds: 15
+missing_example: false
+sensitive_canaries: []

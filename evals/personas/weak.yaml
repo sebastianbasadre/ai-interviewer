@@ -1,0 +1,19 @@
+id: weak
+description: Perfil débil con conducta observable; no equivale a falta de experiencia.
+expected_scores:
+  discovery: 1
+  prioritization: 1
+  metrics_outcomes: 1
+  stakeholders: 1
+  execution: 1
+  communication: 1
+default_answer: En el proyecto de reservas elegí la solución pedida por quien insistía más y mantuve el
+  plan aunque el equipo mostraba bloqueos. No comparé alternativas ni revisé evidencia; consideré exitoso
+  el proyecto porque entregamos las tareas.
+competency_answers: {}
+candidate_question: No tengo preguntas
+tags:
+- ranking_weak
+response_seconds: 15
+missing_example: false
+sensitive_canaries: []

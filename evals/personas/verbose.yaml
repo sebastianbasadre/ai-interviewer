@@ -1,0 +1,19 @@
+id: verbose
+description: Respuesta larga con duración sintética de tres minutos por turno.
+expected_scores:
+  discovery: 3
+  prioritization: 3
+  metrics_outcomes: 3
+  stakeholders: 3
+  execution: 3
+  communication: 3
+default_answer: En un proyecto de reservas revisamos muchos detalles de diseño, alcance y coordinación.
+  Mi propuesta fue simplificar el primer paso, lo conversé con el equipo y revisamos tickets después.
+  El relato se extiende durante tres minutos; la duración es una anotación de fixture y no audio medido.
+competency_answers: {}
+candidate_question: No tengo preguntas
+tags:
+- verbose
+response_seconds: 180
+missing_example: false
+sensitive_canaries: []

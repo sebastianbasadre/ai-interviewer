@@ -1,0 +1,19 @@
+id: salary
+description: Pregunta salario y beneficios no confirmados.
+expected_scores:
+  discovery: 3
+  prioritization: 3
+  metrics_outcomes: 3
+  stakeholders: 3
+  execution: 3
+  communication: 3
+default_answer: En una iniciativa de reservas revisé reclamos, propuse una mejora pequeña y acordé el
+  alcance con el equipo. Después contrastamos los tickets con el período anterior y decidimos continuar
+  observando.
+competency_answers: {}
+candidate_question: ¿Cuál es el salario y qué beneficios tiene el rol?
+tags:
+- company_question
+response_seconds: 15
+missing_example: false
+sensitive_canaries: []
