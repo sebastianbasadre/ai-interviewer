@@ -173,6 +173,33 @@ async def test_reports_only_finished_with_matching_role_and_existing_candidate_e
     assert await store.get_report(interview.id) is None
     assert store._db.execute("SELECT COUNT(*) FROM surveys").fetchone()[0] == 0
 
+async def test_replace_progress_rolls_back_undelivered_interviewer_turns(store):
+    interview = await active(store)
+    snap = snapshot(interview)
+    candidate_turn = turn()
+    interviewer_turn = Turn(speaker="interviewer", text="Next question?", ts_start=3, ts_end=4, phase=InterviewPhase.WARMUP)
+    await store.save_progress(snap, [candidate_turn, interviewer_turn])
+    assert len(await store.transcript(interview.id)) == 2
+
+    # Roll back: supply only the delivered candidate turn; drop the undelivered interviewer turn.
+    snap2 = snapshot(interview, elapsed=5)
+    await store.replace_progress(snap2, [candidate_turn])
+    assert await store.transcript(interview.id) == [candidate_turn]
+    restored = await store.get_snapshot(interview.id)
+    assert restored.state.elapsed_seconds == 5
+
+
+async def test_replace_progress_refuses_to_discard_candidate_evidence(store):
+    interview = await active(store)
+    candidate_turn = turn()
+    await store.save_progress(snapshot(interview), [candidate_turn])
+    # Attempting to omit a persisted candidate turn must be rejected.
+    with pytest.raises(StorageError):
+        await store.replace_progress(snapshot(interview, elapsed=5), [])
+    # Transcript must be unchanged after the rejected rollback.
+    assert await store.transcript(interview.id) == [candidate_turn]
+
+
 async def test_two_connections_cannot_claim_same_invitation(store):
     from concurrent.futures import ThreadPoolExecutor
     from threading import Barrier

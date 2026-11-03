@@ -144,6 +144,21 @@ class InterviewEngine(Protocol):
     def transcript(self) -> list[Turn]: ...
 
 
+class InterviewEngineFactory(Protocol):
+    """Return a fresh, unstarted engine with the same provider configuration.
+
+    The coordinator serializes operations and retains the last delivered state.
+    If speech onset invalidates an awaited response before text delivery, persist
+    the real candidate turn, discard the mutated engine, and restore a fresh one
+    with the last delivered phase/competency/followup state, original deadline,
+    and committed transcript plus that candidate turn. Advance only elapsed time.
+    Never persist or restore the generated but undelivered interviewer question.
+    Rebuilding must not invoke providers or emit speech. Expired deadlines close
+    the session without creating a new engine/provider operation.
+    """
+    def __call__(self) -> InterviewEngine: ...
+
+
 class CompetencyScore(Contract):
     competency_id: str
     score: int | None = Field(default=None, ge=1, le=5, strict=True)
@@ -218,6 +233,16 @@ class SessionStore(Protocol):
     async def accept_consent(self, token_hash: str, consent: ConsentRecord) -> Interview: ...
     async def claim_session(self, token_hash: str, now: datetime) -> Interview: ...
     async def save_snapshot(self, snapshot: SessionSnapshot) -> None: ...
+    async def replace_progress(self, snapshot: SessionSnapshot, turns: list[Turn]) -> None:
+        """Atomic rollback of output not yet accepted by the text enqueue boundary.
+
+        Require active consented ownership and unchanged original deadline. Keep
+        every persisted candidate turn ID/body and prior delivered transcript;
+        only the coordinator's undelivered interviewer turns may be removed.
+        Do not modify recordings, reports, or other interviews. The coordinator
+        supplies the complete committed transcript plus real pending input.
+        """
+        ...
     async def get_snapshot(self, interview_id: UUID) -> SessionSnapshot | None: ...
     async def finish(self, interview_id: UUID, ended_at: datetime, *, aborted: bool = False) -> None: ...
     async def append_turn(self, interview_id: UUID, turn: Turn) -> None: ...

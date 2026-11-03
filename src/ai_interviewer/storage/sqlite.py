@@ -138,27 +138,43 @@ class SQLiteSessionStore:
             return [item for row in rows if (item := Interview.model_validate_json(row["body"])).status == "active"]
 
     async def accept_consent(self, token_hash: str, consent: ConsentRecord) -> Interview:
-        with self._lock, self._db:
-            self._db.execute("BEGIN IMMEDIATE")
-            interview = self._by_token(token_hash)
-            if interview.id != consent.interview_id or interview.status != "invited" or consent.accepted_at >= interview.expires_at:
-                raise StorageError("invitation unavailable")
-            self._db.execute("INSERT INTO consent VALUES(?,?)", (str(interview.id), consent.model_dump_json()))
-            interview = interview.model_copy(update={"status": "consented"})
-            self._write_interview(interview)
-            return interview
+        with self._lock:
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                interview = self._by_token(token_hash)
+                if interview.id != consent.interview_id or interview.status != "invited" or consent.accepted_at >= interview.expires_at:
+                    raise StorageError("invitation unavailable")
+                self._db.execute("INSERT INTO consent VALUES(?,?)", (str(interview.id), consent.model_dump_json()))
+                interview = interview.model_copy(update={"status": "consented"})
+                self._write_interview(interview)
+                self._db.execute("COMMIT")
+                return interview
+            except Exception:
+                try:
+                    self._db.execute("ROLLBACK")
+                except Exception:
+                    pass  # BEGIN may not have acquired a transaction; suppress secondary error.
+                raise
 
     async def claim_session(self, token_hash: str, now: datetime) -> Interview:
-        with self._lock, self._db:
+        with self._lock:
             # Explicit write transaction prevents two processes claiming the same invitation.
-            self._db.execute("BEGIN IMMEDIATE")
-            interview = self._by_token(token_hash)
-            if interview.status != "consented" or now >= interview.expires_at:
-                raise StorageError("invitation unavailable")
-            self._consented(interview.id)
-            interview = interview.model_copy(update={"status": "active", "started_at": now})
-            self._write_interview(interview)
-            return interview
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                interview = self._by_token(token_hash)
+                if interview.status != "consented" or now >= interview.expires_at:
+                    raise StorageError("invitation unavailable")
+                self._consented(interview.id)
+                interview = interview.model_copy(update={"status": "active", "started_at": now})
+                self._write_interview(interview)
+                self._db.execute("COMMIT")
+                return interview
+            except Exception:
+                try:
+                    self._db.execute("ROLLBACK")
+                except Exception:
+                    pass
+                raise
 
     async def issue_session_key(self, interview_id: UUID, expires_at: datetime) -> str:
         with self._lock, self._db:
@@ -193,15 +209,60 @@ class SQLiteSessionStore:
 
     async def save_progress(self, snapshot: SessionSnapshot, turns: list[Turn], flags: list[str] | None = None) -> None:
         """Commit transcript and decision state together before exposing speech/text."""
-        with self._lock, self._db:
-            self._db.execute("BEGIN IMMEDIATE")
-            self._save_snapshot(snapshot)
-            for turn in turns:
-                self._append_turn(snapshot.interview_id, turn)
-            for flag in flags or []:
-                if not re.fullmatch(r"[a-z0-9_]{1,80}", flag):
-                    raise StorageError("invalid technical flag")
-                self._db.execute("INSERT OR IGNORE INTO flags VALUES(?,?)", (str(snapshot.interview_id), flag))
+        with self._lock:
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                self._save_snapshot(snapshot)
+                for turn in turns:
+                    self._append_turn(snapshot.interview_id, turn)
+                for flag in flags or []:
+                    if not re.fullmatch(r"[a-z0-9_]{1,80}", flag):
+                        raise StorageError("invalid technical flag")
+                    self._db.execute("INSERT OR IGNORE INTO flags VALUES(?,?)", (str(snapshot.interview_id), flag))
+                self._db.execute("COMMIT")
+            except Exception:
+                try:
+                    self._db.execute("ROLLBACK")
+                except Exception:
+                    pass
+                raise
+
+    async def replace_progress(self, snapshot: SessionSnapshot, turns: list[Turn]) -> None:
+        """Atomic rollback: discard undelivered interviewer turns, restore from checkpoint.
+
+        The supplied turns are the complete committed transcript after rollback. Every
+        candidate turn that was previously persisted must appear in turns; only
+        undelivered interviewer turns may be absent. Recordings, reports, flags, and
+        other interviews are not modified.
+        """
+        with self._lock:
+            try:
+                self._db.execute("BEGIN IMMEDIATE")
+                # Validate ownership and deadline consistency first.
+                self._save_snapshot(snapshot)
+                # Guard: every previously persisted candidate turn must survive the rollback.
+                existing_rows = self._db.execute(
+                    "SELECT body FROM turns WHERE interview_id=?", (str(snapshot.interview_id),)
+                ).fetchall()
+                existing_candidate_ids = set()
+                for row in existing_rows:
+                    t = Turn.model_validate_json(row["body"])
+                    if t.speaker == "candidate":
+                        existing_candidate_ids.add(t.id)
+                supplied_candidate_ids = {t.id for t in turns if t.speaker == "candidate"}
+                if not existing_candidate_ids.issubset(supplied_candidate_ids):
+                    raise StorageError("replace_progress would discard candidate evidence")
+                # Replace turns atomically.
+                self._db.execute("DELETE FROM turns WHERE interview_id=?", (str(snapshot.interview_id),))
+                for turn in turns:
+                    self._db.execute("INSERT INTO turns VALUES(?,?,?)", (str(turn.id), str(snapshot.interview_id), turn.model_dump_json()))
+                self._db.execute("COMMIT")
+            except Exception:
+                try:
+                    self._db.execute("ROLLBACK")
+                except Exception:
+                    pass
+                raise
 
     async def get_flags(self, interview_id: UUID) -> list[str]:
         with self._lock:
@@ -283,7 +344,6 @@ class SQLiteSessionStore:
                 shutil.rmtree(folder)
             with self._db:
                 self._db.execute("DELETE FROM interviews WHERE id=?", (str(interview_id),))
-            self._db.execute("VACUUM")
 
     async def purge_expired(self, before: datetime) -> int:
         with self._lock:
@@ -296,4 +356,6 @@ class SQLiteSessionStore:
                     expired.append(interview.id)
             for interview_id in expired:
                 await self.delete(interview_id)
+            if expired:
+                self._db.execute("VACUUM")
             return len(expired)
