@@ -36,3 +36,21 @@ Retención propuesta de 30 días conservada. Video persistido pendiente de defin
 Checkpoints fase 2: web/API y pipeline en worktrees aislados, sin integrar ni declarar completos. Retomados tras aprobación de G2.
 
 
+
+## Construcción posterior a G2
+- Motor/scoring: implementación offline lista; correcciones STAR y test de privacidad en e86e064 (53 tests en homelab). Pendiente re-review.
+- API/storage: eaac62c (34 tests); correcciones en curso por carrera inicio/watchdog y recuperación al finalizar.
+- Pipeline: 7d27646 (36 tests con Pipecat); control de habla/concurrencia corregido. Interrupción durante generación se detiene de forma segura hasta integrar factory/restore transaccional.
+- Contrato factory/restore: fb44d52 de architect, pendiente integración/revisión.
+- QA: harness y E2E offline en construcción; 78 tests en snapshot combinado de trabajo, sin llamadas reales.
+- Runtime: composición local con mocks y comandos de desarrollo en construcción.
+
+Los conteos corresponden a snapshots distintos y no se suman. Ninguna rama de implementación se integra sin re-review y tests.
+
+## Integración verificada
+- Engine e86e064 y API12b30e6: re-review APROBAR, integrados en orden.
+- QA36b0508: APROBAR herramientas offline; integrado por cherry-pick36f6b11.
+- Homelab main combinado:82 tests correctos;33 sesiones sintéticas offline y0 fallas estructurales.
+- Runtime 6451d2a: APROBAR; runtime.py, __main__.py, replace_progress implementado, transacciones BEGIN IMMEDIATE endurecidas, VACUUM por lote. Integrado en main.
+- Calidad semántica, ranking y latencia reales siguen sin evaluar.
+- Pendiente antes G3: integrar feat/pipeline-mock (requiere re-review con contrato factory/restore de main); luego preparar adaptador real con reserva de presupuesto y factory de evals auditada.
