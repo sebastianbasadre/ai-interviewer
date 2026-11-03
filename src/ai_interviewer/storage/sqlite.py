@@ -150,7 +150,10 @@ class SQLiteSessionStore:
                 self._db.execute("COMMIT")
                 return interview
             except Exception:
-                self._db.execute("ROLLBACK")
+                try:
+                    self._db.execute("ROLLBACK")
+                except Exception:
+                    pass  # BEGIN may not have acquired a transaction; suppress secondary error.
                 raise
 
     async def claim_session(self, token_hash: str, now: datetime) -> Interview:
@@ -167,7 +170,10 @@ class SQLiteSessionStore:
                 self._db.execute("COMMIT")
                 return interview
             except Exception:
-                self._db.execute("ROLLBACK")
+                try:
+                    self._db.execute("ROLLBACK")
+                except Exception:
+                    pass
                 raise
 
     async def issue_session_key(self, interview_id: UUID, expires_at: datetime) -> str:
@@ -215,7 +221,10 @@ class SQLiteSessionStore:
                     self._db.execute("INSERT OR IGNORE INTO flags VALUES(?,?)", (str(snapshot.interview_id), flag))
                 self._db.execute("COMMIT")
             except Exception:
-                self._db.execute("ROLLBACK")
+                try:
+                    self._db.execute("ROLLBACK")
+                except Exception:
+                    pass
                 raise
 
     async def replace_progress(self, snapshot: SessionSnapshot, turns: list[Turn]) -> None:
@@ -235,11 +244,11 @@ class SQLiteSessionStore:
                 existing_rows = self._db.execute(
                     "SELECT body FROM turns WHERE interview_id=?", (str(snapshot.interview_id),)
                 ).fetchall()
-                existing_candidate_ids = {
-                    Turn.model_validate_json(row["body"]).id
-                    for row in existing_rows
-                    if Turn.model_validate_json(row["body"]).speaker == "candidate"
-                }
+                existing_candidate_ids = set()
+                for row in existing_rows:
+                    t = Turn.model_validate_json(row["body"])
+                    if t.speaker == "candidate":
+                        existing_candidate_ids.add(t.id)
                 supplied_candidate_ids = {t.id for t in turns if t.speaker == "candidate"}
                 if not existing_candidate_ids.issubset(supplied_candidate_ids):
                     raise StorageError("replace_progress would discard candidate evidence")
@@ -249,7 +258,10 @@ class SQLiteSessionStore:
                     self._db.execute("INSERT INTO turns VALUES(?,?,?)", (str(turn.id), str(snapshot.interview_id), turn.model_dump_json()))
                 self._db.execute("COMMIT")
             except Exception:
-                self._db.execute("ROLLBACK")
+                try:
+                    self._db.execute("ROLLBACK")
+                except Exception:
+                    pass
                 raise
 
     async def get_flags(self, interview_id: UUID) -> list[str]:
