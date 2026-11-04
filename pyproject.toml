@@ -21,6 +21,7 @@ realtime = ["pipecat-ai==1.15.0"]
 media = ["pipecat-ai[webrtc,whisper,piper,tavus,silero]==1.15.0"]
 llm = ["httpx==0.28.1"]
 test = ["pytest==9.2.0", "pytest-asyncio==1.4.1.post1", "httpx==0.28.1"]
+musetalk = ["musetalk @ git+https://github.com/TMElyralab/MuseTalk.git"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/ai_interviewer"]

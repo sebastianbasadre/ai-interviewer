@@ -5,6 +5,12 @@ from typing import Literal
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# ---------------------------------------------------------------------------
+# Note: avatar_mode includes "musetalk" for local GPU inference via MuseTalk.
+# Default remains "mock".  "tavus" consumes paid minutes; "musetalk" is free
+# but requires the optional .[musetalk] extra and a portrait image.
+# ---------------------------------------------------------------------------
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore", hide_input_in_errors=True)
@@ -34,8 +40,15 @@ class Settings(BaseSettings):
     stt_provider: Literal["whisper_local", "openai"] = "whisper_local"
     whisper_model: str = "large-v3-turbo"
     whisper_device: Literal["cuda", "cpu"] = "cuda"
-    avatar_mode: Literal["mock", "tavus"] = "mock"
+    avatar_mode: Literal["mock", "tavus", "musetalk"] = "mock"
     tavus_max_minutes_per_session: int = Field(default=30, ge=1, le=30)
+    # MuseTalk local avatar settings (avatar_mode="musetalk").
+    # musetalk_avatar_image: absolute path to the interviewer portrait file.
+    # musetalk_fps: video frame rate for inference (10–30 fps).
+    # musetalk_enabled: mirror of tavus_enabled; activates the video pipeline.
+    musetalk_avatar_image: Path | None = None
+    musetalk_fps: int = Field(default=25, ge=10, le=30)
+    musetalk_enabled: bool = False
     public_base_url: str = "http://localhost:8000"
     allow_mock_lan_http: bool = False
     realtime_enabled: bool = False

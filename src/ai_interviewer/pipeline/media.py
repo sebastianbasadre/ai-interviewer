@@ -33,6 +33,7 @@ class MediaManager:
         self._lock = asyncio.Lock()
         self._models = None
         self._voices = {}
+        self._musetalk = None  # loaded in prepare() when avatar_mode="musetalk"
 
     async def prepare(self):
         """Download/load local models once, outside any invitation request."""
@@ -56,7 +57,20 @@ class MediaManager:
             model = WhisperModel(self.settings.whisper_model, device=self.settings.whisper_device,
                                  compute_type="int8" if self.settings.whisper_device == "cpu" else "float16")
             return model
+
+        def load_musetalk():
+            """Load MuseTalk model on the thread pool; never blocks the event loop."""
+            from ai_interviewer.pipeline.musetalk_service import load_musetalk_model
+            avatar_image = self.settings.musetalk_avatar_image
+            if avatar_image is None:
+                raise MediaUnavailable(
+                    "MUSETALK_AVATAR_IMAGE is required when AVATAR_MODE=musetalk."
+                )
+            return load_musetalk_model(str(avatar_image))
+
         self._models = await asyncio.to_thread(load)
+        if self.settings.avatar_mode == "musetalk" and self.settings.musetalk_enabled:
+            self._musetalk = await asyncio.to_thread(load_musetalk)
 
     async def offer(self, interview_id: UUID, *, sdp: str, type: str,
                     submit: Callable[[str], Awaitable[dict]], initial_text: str, deadline: datetime):
@@ -145,11 +159,14 @@ class MediaManager:
                 remaining = min(remaining, self.settings.tavus_max_minutes_per_session * 60)
             if remaining < 1:
                 raise MediaUnavailable("Interview time limit reached.")
+            video_enabled = self.settings.tavus_enabled or (
+                self.settings.musetalk_enabled and self.settings.avatar_mode == "musetalk"
+            )
             transport = SmallWebRTCTransport(peer.connection, TransportParams(
                 audio_in_enabled=True, audio_out_enabled=True,
-                video_out_enabled=self.settings.tavus_enabled, video_out_is_live=True,
+                video_out_enabled=video_enabled, video_out_is_live=True,
                 video_out_width=1280, video_out_height=720,
-                audio_out_auto_silence=not self.settings.tavus_enabled))
+                audio_out_auto_silence=not video_enabled))
             class BilingualPiper(PiperTTSService):
                 async def run_tts(self, text, context_id):
                     self._voice = manager._voices[detect_language(text, "en")]
@@ -166,6 +183,13 @@ class MediaManager:
                     from ai_interviewer.pipeline.tavus_compat import create_tavus_video_service
                     processors.append(create_tavus_video_service(self.settings, session,
                                                                  max_duration_seconds=int(remaining)))
+                if self.settings.musetalk_enabled and self.settings.avatar_mode == "musetalk":
+                    from ai_interviewer.pipeline.musetalk_service import MuseTalkVideoService
+                    musetalk_service = MuseTalkVideoService(
+                        self._musetalk,
+                        fps=self.settings.musetalk_fps,
+                    )
+                    processors.append(musetalk_service.processor)
                 processors.append(transport.output())
                 worker = PipelineWorker(Pipeline(processors), enable_rtvi=False,
                     params=PipelineParams(audio_in_sample_rate=16000, audio_out_sample_rate=24000),
@@ -177,7 +201,12 @@ class MediaManager:
 
                 @transport.event_handler("on_client_connected")
                 async def connected(transport, client):
-                    peer.connection.send_app_message({"type": "media-ready", "avatar": self.settings.tavus_enabled})
+                    active_avatar = (
+                        "tavus" if self.settings.tavus_enabled
+                        else "musetalk" if (self.settings.musetalk_enabled and self.settings.avatar_mode == "musetalk")
+                        else "none"
+                    )
+                    peer.connection.send_app_message({"type": "media-ready", "avatar": active_avatar})
                     await worker.queue_frame(TTSSpeakFrame(text=initial_text))
 
                 @transport.event_handler("on_client_disconnected")
