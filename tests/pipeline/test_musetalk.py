@@ -329,9 +329,16 @@ class TestConfigAcceptsMusetalk:
         with pytest.raises(ValidationError):
             Settings(_env_file=None, musetalk_fps=31)
 
-    def test_musetalk_avatar_image_accepts_path(self):
-        s = Settings(_env_file=None, musetalk_avatar_image=Path("/tmp/portrait.jpg"))
-        assert s.musetalk_avatar_image == Path("/tmp/portrait.jpg")
+    def test_musetalk_avatar_image_accepts_path(self, tmp_path):
+        portrait = tmp_path / "portrait.jpg"
+        portrait.write_bytes(b"\xff\xd8\xff")  # minimal JPEG header
+        s = Settings(_env_file=None, musetalk_avatar_image=portrait)
+        assert s.musetalk_avatar_image == portrait
+
+    def test_musetalk_avatar_image_rejects_missing_file(self):
+        from pydantic import ValidationError
+        with pytest.raises(ValidationError, match="does not exist"):
+            Settings(_env_file=None, musetalk_avatar_image=Path("/tmp/nonexistent_portrait.jpg"))
 
     def test_musetalk_enabled_true_does_not_require_api_keys(self):
         """MuseTalk requires no API keys; missing_secrets must remain empty."""
