@@ -39,7 +39,7 @@ async def test_three_runs_median_dispersion_and_real_citations():
     assert all(score.score == 3 and score.dispersion == 3 for score in report.scores)
     assert "scoring_dispersion" in report.flags
     assert all(score.evidence_turn_ids == [turn.id] for score, turn in zip(report.scores, turns))
-    assert "recomendación" in report.recommendation.casefold()
+    assert "recommendation" in report.recommendation.casefold()
     assert "estado civil" in model.calls[0][0] and "apariencia" in model.calls[0][0]
     assert str(turns[0].id) in render_markdown(report, turns)
 
@@ -100,7 +100,7 @@ async def test_transversal_can_cite_other_competency():
 
 async def test_explicit_mock_never_fabricates_numeric_scores():
     report = await InterviewScorer(MockScoringModel()).score(uuid4(), ROLE, [])
-    assert "mock_scoring" in report.flags and "mock" in report.summary
+    assert "mock_scoring" in report.flags and "mock" in report.summary.casefold()
     assert all(score.score is None for score in report.scores)
 
 

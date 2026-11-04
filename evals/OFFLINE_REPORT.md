@@ -1,25 +1,28 @@
-# Resultado offline — 2026-11-02
+# Resultados offline — 2026-11-02
 
-Se ejecutó en el homelab `192.168.2.6`, WSL2 NVIDIA-Workbench, Python 3.12.16:
+Ejecutado en homelab `192.168.2.6`, WSL2 NVIDIA-Workbench, Python 3.12.16:
 
 ```bash
 PYTHONPATH=src make test VENV=/home/workbench/.venvs/ai-interviewer
 PYTHONPATH=src /home/workbench/.venvs/ai-interviewer/bin/python -m evals.run_evals --runs 3
 ```
 
-- Suite del snapshot QA: **78 tests pasan** (incluye motor, API/storage y diez tests de integración/evals).
-- Harness: **33 sesiones sintéticas offline**, cero fallas estructurales registradas.
+- Suite de snapshot QA: **78 pruebas pasadas**, incluyendo motor, API/almacenamiento y diez
+  pruebas de integración/evaluación.
+- Harness: **33 sesiones sintéticas offline**, cero fallos estructurales registrados.
 - Resultados locales: `evals/results/20261102T225240467142Z.json` y `.md`, excluidos de Git.
-- El E2E usa motor determinístico, FastAPI y SQLite reales; únicamente el proveedor de scoring es mock.
-- Se probó consentimiento → sala → seis competencias → cierre → reporte → encuesta → borrado.
-- También se probó reinicio/reanudación conservando deadline y repreguntas, y cierre sin nuevas solicitudes al vencer el tiempo.
+- El E2E usa el motor determinista real, FastAPI y SQLite; solo el proveedor de puntuación
+  está simulado.
+- Probado consentimiento → sala → seis competencias → cierre → informe → encuesta → eliminación.
+- También probado reinicio/reanudación preservando plazo y conteos de seguimientos, y cierre
+  sin nuevas solicitudes cuando expira el tiempo.
 
-Todas las métricas de calidad de modelos permanecen **not_evaluated**. El scoring mock no
-asignó números. Esta corrida no acredita ranking, precisión, resistencia semántica a
-inyección, ausencia semántica de datos sensibles ni latencia real. No habilita un piloto
-con personas. La propuesta G3 y sus límites están en [README.md](README.md).
+Todas las métricas de calidad del modelo permanecen **not_evaluated**. La puntuación
+simulada no asignó números. Esta ejecución no establece ranking, precisión, resistencia
+semántica a inyecciones, ausencia semántica de datos sensibles ni latencia real. No
+autoriza un piloto con personas. La propuesta G3 y los límites están en [README.md](README.md).
 
-Snapshot probado: engine `e86e064` y API `eaac62c`, más entregables QA de esta rama.
-Las correcciones posteriores de los dueños y su integración requieren volver a correr
-esta suite. La advertencia de deprecación del TestClient HTTPX está pendiente de decisión
-del responsable de dependencias; no impide las pruebas.
+Snapshot probado: motor `e86e064`, API `eaac62c` y entregables QA en esta rama.
+Las correcciones posteriores del dueño y la integración requieren volver a ejecutar esta
+suite. La advertencia de deprecación de HTTPX en TestClient espera la decisión del dueño
+de la dependencia; no impide las pruebas.

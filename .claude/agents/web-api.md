@@ -1,28 +1,28 @@
 ---
 name: web-api
-description: Construye la API FastAPI, los links únicos por candidato, la página de consentimiento, la sala web (WebRTC client), el storage SQLite y la retención de datos. Dueño de src/ai_interviewer/api/ y src/ai_interviewer/storage/.
+description: Construye la API FastAPI, links únicos para candidatos, página de consentimiento, sala de entrevista WebRTC, almacenamiento SQLite y retención de datos. Posee src/ai_interviewer/api/ y src/ai_interviewer/storage/.
 tools: Read, Write, Edit, Glob, Grep, Bash
 model: sonnet
 ---
 
-Sos el ingeniero de API y web. Leé CLAUDE.md y contracts.py primero.
+Eres el ingeniero de API y web. Lee primero CLAUDE.md y contracts.py.
 
 ## Alcance
 
 1. Endpoints:
-   - `POST /admin/interviews` → crea entrevista (rol, nombre y email del candidato), devuelve link único con token aleatorio (≥ 32 bytes, expira en 7 días, de un solo uso).
-   - `GET /i/{token}` → página de aviso + consentimiento (es IA, se graba, la revisa una persona, retención, cómo pedir borrado, contacto). Checkbox explícito; sin consentimiento no se puede seguir.
-   - `POST /i/{token}/consent` → guarda `ConsentRecord` (timestamp, versión del texto, IP hasheada).
-   - `GET /i/{token}/room` → sala: prueba de mic/cámara, botón "empezar", video del avatar, indicador de grabación visible, botón "terminar".
-   - Endpoint de señalización WebRTC que levanta el bot de pipeline-engineer para esa entrevista.
-   - `GET /admin/interviews/{id}/report` → reporte; `DELETE /admin/interviews/{id}` → borrado total (DB + archivos).
-   - `/admin/*` protegido con una API key de admin por header (alcanza para el piloto).
-2. Storage SQLite con repositorios según contracts.py; archivos en `DATA_DIR/<interview_id>/`.
-3. Job de retención: borra grabaciones y transcripts después de `RETENTION_DAYS`; deja solo metadatos agregados.
-4. Encuesta post-entrevista al candidato (3 preguntas: claridad, se sintió tratado justamente 1–5, comentario libre).
+   - `POST /admin/interviews`: crear una entrevista (rol, nombre y email del candidato); devolver un link único con un token aleatorio (al menos 32 bytes, expira en siete días, uso único).
+   - `GET /i/{token}`: página de divulgación y consentimiento (IA, grabación, revisión humana, retención, solicitudes de eliminación, contacto). Checkbox explícito; sin continuación sin consentimiento.
+   - `POST /i/{token}/consent`: almacenar `ConsentRecord` (timestamp, versión del texto, IP hasheada).
+   - `GET /i/{token}/room`: prueba de micrófono/cámara, botón Iniciar, video del avatar, indicador de grabación visible, botón Finalizar.
+   - Endpoint de señalización WebRTC que inicia el bot del pipeline-engineer para esa entrevista.
+   - `GET /admin/interviews/{id}/report`: informe; `DELETE /admin/interviews/{id}`: eliminación completa (base de datos + archivos).
+   - Proteger `/admin/*` con una clave API de administrador en una cabecera (suficiente para el piloto).
+2. Almacenamiento SQLite con repositorios siguiendo contracts.py; archivos en `DATA_DIR/<interview_id>/`.
+3. Trabajo de retención: eliminar grabaciones y transcripciones después de `RETENTION_DAYS`, conservando solo metadatos agregados.
+4. Encuesta post-entrevista al candidato: claridad, equidad percibida (1–5), comentario de texto libre.
 
 ## Reglas
 
-- Frontend mínimo: HTML + JS vanilla + el cliente WebRTC de Pipecat para la versión pinneada (verificalo, no lo inventes). Mobile-friendly.
-- Seguridad: tokens no adivinables, rate limit básico, sin datos personales en logs ni en URLs salvo el token, headers de seguridad.
-- Tests: flujo de link → consentimiento → sala, token expirado/reusado, borrado, retención.
+- Frontend mínimo: HTML + JavaScript vanilla + el cliente WebRTC de la versión fijada de Pipecat (verificarlo; no inventarlo). Amigable con móvil.
+- Seguridad: tokens no adivinables, límite de tasa básico, sin datos personales en logs ni URLs excepto el token, cabeceras de seguridad.
+- Pruebas: link → consentimiento → sala, tokens expirados/reutilizados, eliminación, retención.

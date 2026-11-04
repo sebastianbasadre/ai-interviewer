@@ -37,6 +37,29 @@ async def at_competency(engine):
     return await engine.on_candidate_turn(answer(engine))
 
 
+async def test_mock_demo_advances_after_one_followup_even_after_restore():
+    engine = StructuredInterviewEngine(mock_single_followup=True, now=lambda: NOW)
+    await at_competency(engine)
+    for index in range(6):
+        followup = await engine.on_candidate_turn(answer(engine))
+        assert followup.state.competency_index == index
+        assert followup.state.followup_count == 1
+        assert "star_followup" in followup.flags
+        snapshot = SessionSnapshot(interview_id=uuid4(), state=engine.state,
+                                   deadline=NOW + timedelta(minutes=30), updated_at=NOW)
+        resumed = StructuredInterviewEngine(mock_single_followup=True, now=lambda: NOW)
+        await resumed.restore(ROLE, CANDIDATE, snapshot, engine.transcript())
+        decision = await resumed.on_candidate_turn(answer(resumed))
+        assert "mock_script_advance" in decision.flags
+        engine = resumed
+        if index < 5:
+            assert decision.state.competency_index == index + 1
+        else:
+            assert decision.state.phase == InterviewPhase.CANDIDATE_QUESTIONS
+    await engine.on_candidate_turn(answer(engine, "No tengo preguntas"))
+    assert (await engine.on_candidate_turn(answer(engine, "Gracias"))).end_session
+
+
 async def test_deterministic_complete_phases_and_all_six_competencies():
     engine = StructuredInterviewEngine(analyzer=Concrete(), now=lambda: NOW)
     decision = await engine.start(ROLE, CANDIDATE)
@@ -193,3 +216,58 @@ async def test_missing_result_analysis_requests_star_instead_of_advancing():
     assert decision.state.followup_count == 1
     assert "star_followup" in decision.flags
     assert "resultado o aprendizaje" in decision.text
+
+
+async def test_followup_result_completes_original_example_after_restore():
+    import json
+    class Model:
+        def __init__(self): self.calls = []
+        async def complete(self, system, user):
+            payload = json.loads(user)
+            self.calls.append(payload)
+            complete = "bajaron un 20%" in payload["candidate_data"]
+            return AnswerAnalysis(concrete_example=complete,
+                                  missing_component="none" if complete else "result").model_dump_json()
+    model = Model()
+    engine = StructuredInterviewEngine(analyzer=LLMAnswerAnalyzer(model), now=lambda: NOW)
+    initial = await at_competency(engine)
+    followup = await engine.on_candidate_turn(answer(engine, "En el proyecto de pagos entrevisté usuarios y cambié el flujo."))
+    assert "resultado concreto" in followup.text
+    snapshot = SessionSnapshot(interview_id=uuid4(), state=engine.state,
+                               deadline=NOW+timedelta(minutes=30), updated_at=NOW)
+    resumed = StructuredInterviewEngine(analyzer=LLMAnswerAnalyzer(model), now=lambda: NOW)
+    await resumed.restore(ROLE, CANDIDATE, snapshot, engine.transcript())
+    decision = await resumed.on_candidate_turn(answer(resumed, "Los errores bajaron un 20%."))
+    assert decision.state.competency_index == 1
+    assert "entrevisté usuarios" in model.calls[-1]["candidate_data"]
+    assert "bajaron un 20%" in model.calls[-1]["candidate_data"]
+    assert model.calls[-1]["question"] == initial.text
+    await resumed.on_candidate_turn(answer(resumed, "En otro proyecto prioricé el backlog."))
+    assert "proyecto de pagos" not in model.calls[-1]["candidate_data"]
+
+
+async def test_long_initial_answer_does_not_hide_followup_from_analyzer():
+    analyzer = Concrete()
+    class Incomplete(Concrete):
+        async def analyze(self, text, question):
+            self.calls.append((text, question))
+            return AnswerAnalysis()
+    analyzer = Incomplete()
+    engine = StructuredInterviewEngine(analyzer=analyzer, now=lambda: NOW)
+    await at_competency(engine)
+    await engine.on_candidate_turn(answer(engine, "Proyecto profesional. " * 500))
+    await engine.on_candidate_turn(answer(engine, "El resultado fue una reducción del 20%."))
+    assert len(analyzer.calls[-1][0]) < 4000
+    assert "reducción del 20%" in analyzer.calls[-1][0]
+
+
+async def test_context_first_starts_with_professional_context():
+    engine = StructuredInterviewEngine(context_first=True, now=lambda: NOW)
+    first = await engine.start(ROLE, CANDIDATE)
+    assert first.state.phase == InterviewPhase.WARMUP
+    assert "contexto profesional" in first.text
+    assert "Soy un entrevistador de IA" in first.text
+    assert "¿Podemos empezar?" not in first.text
+    following = await engine.on_candidate_turn(answer(engine, "Soy director de producto"))
+    assert following.state.phase == InterviewPhase.COMPETENCIES
+    assert following.state.competency_index == 0

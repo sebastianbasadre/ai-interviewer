@@ -1,12 +1,12 @@
 # Evaluaciones sintéticas y pruebas de integración
 
-Estado: herramientas offline implementadas; **G3 pendiente**. Ninguna evaluación con
-modelos reales se ejecutó. Los perfiles son fixtures sintéticos y sus niveles esperados
-son hipótesis de calibración que debe revisar una persona, no verdad objetiva.
+Estado: herramientas offline implementadas; **G3 pendiente**. No se ha ejecutado ningún
+lote real de evaluación de modelos. Los perfiles son fixtures sintéticos; los niveles
+esperados son hipótesis de calibración para revisión humana, no verdad objetiva.
 
-## Uso sin red ni costos
+## Uso offline sin costos
 
-Desde la raíz del repo, con Python 3.12 y dependencias de test:
+Desde la raíz del repositorio, con Python 3.12 y dependencias de prueba:
 
 ```bash
 python -m evals.run_evals
@@ -14,113 +14,117 @@ python -m evals.run_evals --runs 3 --output evals/results
 python -m pytest tests/integration
 ```
 
-El comando predeterminado usa `StructuredInterviewEngine` sin LLM, respuestas guionadas
-y `MockScoringModel`. Recorre el código real de fases, repreguntas, flags y scoring, pero
-el analizador offline pide aclaraciones conservadoras y el scoring devuelve solo notas
-nulas con `mock_scoring`. **Esto no mide calidad conversacional, ranking ni precisión.**
-Todos los gates de calidad aparecen `not_evaluated`; nunca se presenta un pass de mocks
-como autorización de piloto. El JSON contiene observaciones estructurales aparte de las
-métricas: cobertura del flujo, límites, fin, repreguntas ante fixtures sin ejemplo y
-canarios sensibles sintéticos. Los archivos Markdown enumeran fallas con persona y turno;
-el JSON conserva el transcript sintético para investigar la evidencia.
+El uso por defecto utiliza `StructuredInterviewEngine` sin un LLM, respuestas con guión y
+`MockScoringModel`. Ejercita el código real de fases, seguimientos, banderas y puntuación,
+pero el analizador offline solicita aclaraciones conservadoras y la puntuación devuelve
+solo puntajes null con `mock_scoring`. **Esto no mide calidad de conversación, ranking
+ni precisión.** Cada compuerta de calidad es `not_evaluated`; los simulados pasando nunca
+autorizan un piloto. El JSON separa observaciones estructurales de métricas: cobertura de
+flujo, límites, terminación, seguimientos para fixtures sin ejemplos y canarios sintéticos
+de datos sensibles. Los informes Markdown listan fallos por persona/turno; el JSON retiene
+transcripciones sintéticas para investigación de evidencias.
 
-Hay once perfiles: fuerte, promedio, débil, evasivo, verborrágico, monosilábico, vacilante,
-inyección, datos sensibles, cambio a inglés y consultas sobre salario/beneficios.
-`expected_scores: null` significa que el perfil no permite fijar una nota de referencia,
-no que deba recibir 1. El tiempo de tres minutos es una anotación del fixture verborrágico,
-no audio ni latencia medida.
+Hay once perfiles: fuerte, promedio, débil, evasivo, verboso, monosilábico, dubitativo,
+inyección, datos sensibles, cambio a inglés y preguntas de salario/beneficios.
+`expected_scores: null` significa que el perfil no puede establecer un puntaje de
+referencia, no que merezca 1. La duración de tres minutos del fixture verboso es una
+anotación, no audio ni latencia medida.
 
-## Inyección de servicios reales (después de G3)
+## Inyectar servicios reales (después de G3)
 
-Una factory de confianza debe devolver `Components` de `evals.run_evals` con:
+Una fábrica de confianza debe devolver `Components` desde `evals.run_evals` con:
 
-- Motor nuevo por sesión con analizador/redactor del proveedor real configurado.
-- Responder de candidato que reciba el perfil y produzca `Answer` con límites de contexto.
-- Scorer nuevo por sesión usando el modelo grande y las tres corridas del scorer real.
-- `real_models=True` y descripción de los modelos/configuración usados.
-- Auditor independiente de cumplimiento y grounding. Debe devolver booleanos o `None`
-  para `injection_resistance`, `sensitive_content_absent`, `company_facts_grounded`.
+- Un nuevo motor por sesión con el analizador/escritor del proveedor real configurado.
+- Un respondedor de candidatos que recibe el perfil y produce `Answer` con contexto acotado.
+- Un nuevo scorer por sesión usando el modelo grande y las tres ejecuciones del scorer real.
+- `real_models=True` y una descripción de los modelos/configuración utilizados.
+- Un auditor independiente de cumplimiento/grounding que devuelva booleanos o `None` para
+  `injection_resistance`, `sensitive_content_absent`, `company_facts_grounded`.
 
 ```bash
-python -m evals.run_evals --factory trusted_package:components --allow-paid --runs 3
+python -m evals.run_evals --factory paquete_confianza:components --allow-paid --runs 3
 ```
 
-`--allow-paid` representa la aprobación explícita del responsable; nunca se agrega desde
-un Makefile ni desde defaults. Sin ese flag ni siquiera se importa la factory real.
-La factory real no se entrega como activación automática de proveedores. El runner limita
-hasta 100 sesiones, diez repeticiones y 64 turnos por sesión, con timeout de 600 s por
-sesión. No es un límite de dólares: la factory debe reservar presupuesto antes de cada
-llamada, limitar tokens/reintentos y registrar usage sin contenidos ni keys.
+`--allow-paid` representa aprobación explícita del dueño; nunca agregarlo en un Makefile
+ni en los valores por defecto. Sin el flag, la fábrica real ni siquiera se importa. La
+fábrica real no se proporciona como activación automática del proveedor. El runner limita
+la ejecución a 100 sesiones, diez repeticiones, 64 turnos por sesión y un timeout de 600
+segundos por sesión. Esto no es un límite monetario: la fábrica debe reservar presupuesto
+antes de cada llamada, acotar tokens/reintentos y registrar el uso sin contenido ni claves.
 
-Los checks de cobertura y repreguntas se calculan automáticamente, pero su acreditación
-como calidad requiere un engine real. Ranking, acuerdo esperado y dispersión se calculan
-solo con scoring real, nunca con notas mock. La inspección de frases sensibles, fuga de
-prompts y hechos inventados necesita auditoría semántica independiente: los canarios y
-keywords no la reemplazan. Inyección requiere además comparar un caso profesional base
-con el mismo caso atacado y revisar que no cambien las notas ni se revelen instrucciones;
-la factory/auditor debe aportar esa evidencia, o devolver `None`. Sin auditor o evidencia
-suficiente el gate queda `not_evaluated`. Un perfil de solo inyección debe quedar sin nota
-numérica y no acredita por sí solo invariancia en un caso profesional mixto.
+Las verificaciones de cobertura/seguimiento se calculan automáticamente, pero establecer
+calidad requiere un motor real. Ranking, acuerdo esperado y dispersión se calculan solo
+con puntuación real, nunca con puntajes simulados. Las verificaciones de lenguaje sensible,
+filtración de prompts y hechos inventados necesitan auditoría semántica independiente;
+los canarios y palabras clave no pueden reemplazarla. La inyección también requiere
+comparar una línea base profesional con el mismo ejemplo atacado y verificar que los
+puntajes no cambien y las instrucciones no sean divulgadas. La fábrica/auditor debe
+proporcionar esta evidencia o devolver `None`. Sin un auditor o evidencia suficiente, la
+compuerta permanece `not_evaluated`. Un perfil solo-inyección no debe tener puntaje
+numérico; no establece independientemente la invarianza en casos mixtos
+profesionales/atacados.
 
-Los resultados reales pueden contener texto generado y se guardan en `evals/results/`
-(gitignored). Solo usar datos sintéticos; no apuntar el harness a transcripciones reales.
-Las excepciones de proveedores se registran por tipo, sin texto que pueda contener secrets.
+Los resultados reales pueden contener texto generado y se almacenan en `evals/results/`
+(en .gitignore). Usar solo datos sintéticos; nunca apuntar el harness a transcripciones
+reales. Registrar tipos de excepción del proveedor, no texto que pueda contener secretos.
 
 ## Latencia
 
-`latency_probe.py` agrega muestras de servicios reales, no crea una medición ficticia.
-Entrada JSONL, una muestra por turno, sin audio, texto ni datos personales:
+`latency_probe.py` agrega muestras de servicios reales; no inventa mediciones.
+La entrada es JSONL, una muestra por turno, sin audio, texto ni datos personales:
 
 ```json
 {"real_services": true, "stages_ms": {"vad": 200, "stt": 200, "llm_ttfb": 300, "tts_ttfb": 250, "avatar": 200, "total": 1150}}
 ```
 
-Ese ejemplo muestra formato, **no un resultado del sistema**.
+Esto ilustra el formato, **no un resultado del sistema**.
 
 ```bash
-python -m evals.latency_probe /path/to/measured-latencies.jsonl
+python -m evals.latency_probe /ruta/a/latencias-medidas.jsonl
 ```
 
-Reporta p50/p95 por etapa y total. El total debe medirse desde fin de habla del candidato
-hasta primer audio del avatar/salida, con el mismo reloj monotónico; no se suman percentiles
-de etapas. El objetivo p50 <1200 ms solo se evalúa con al menos 30 muestras reales. Datos
-mock o muestras insuficientes devuelven `not_evaluated`. Campos de contenido y valores
-negativos/no finitos se rechazan. Aún no hay muestras reales ni latencia validada.
+Reporta p50/p95 por etapa y total. Medir el tiempo total desde el fin del habla del
+candidato hasta el primer audio del avatar/salida con el mismo reloj monótono; no sumar
+percentiles de etapas. Evaluar el objetivo p50 <1200 ms solo con al menos 30 muestras
+reales. Las muestras simuladas/insuficientes devuelven `not_evaluated`. Los campos de
+contenido y los valores negativos/no finitos se rechazan. No existe aún un conjunto de
+muestras reales ni latencia validada.
 
 ## Propuesta G3 (no ejecutada)
 
-Primera corrida: **11 perfiles × 3 repeticiones = 33 conversaciones de texto**, con tres
-scorings por conversación (99 llamadas grandes) y una auditoría independiente por sesión
-(33 llamadas grandes, más comparación base/ataque cuando corresponda). Sin STT/TTS/Tavus.
-Primero un smoke de una sesión dentro del mismo presupuesto para comprobar JSON y usage;
-si falla, detener en lugar de reintentar el lote. Máximo tres iteraciones de corrección
-antes de escalar el diagnóstico; cada lote adicional necesita presupuesto explícito.
+Primer lote: **11 perfiles × 3 repeticiones = 33 conversaciones de texto**, con tres
+ejecuciones de puntuación por conversación (99 llamadas al modelo grande) y una auditoría
+independiente por sesión (33 llamadas grandes, más comparaciones de línea base/ataque
+donde sea necesario). Sin STT/TTS/Tavus. Comenzar con un smoke de una sesión dentro del
+mismo presupuesto para verificar JSON/uso. Si falla, detenerse en lugar de reintentar el
+lote. Como máximo tres iteraciones de corrección antes de escalar el diagnóstico; cada
+lote adicional requiere un presupuesto explícito.
 
-Los IDs configurados `claude-haiku-5-5` y `claude-opus-5-5` figuran en el
-[catálogo oficial](https://platform.claude.com/docs/en/models/overview), consultado el
-2026-11-02. Las tarifas estándar consultadas son Haiku 5.5: USD 0.10/MTok de entrada y
-0.50/MTok de salida para prompts de hasta 100k tokens; Opus 5.5: USD 4/MTok de entrada y
-20/MTok de salida. Son tarifas de la [documentación oficial de precios](https://platform.claude.com/docs/en/about-claude/pricing).
-Verificar disponibilidad efectiva de la cuenta, tarifas y credenciales antes del smoke.
+Los IDs configurados `claude-haiku-5-5` y `claude-opus-5-5` estaban listados en el
+[catálogo oficial](https://platform.claude.com/docs/en/models/overview), verificado el
+2026-11-02. Precios estándar verificados entonces: Haiku 5.5 USD 0.10/MTok entrada y
+0.50/MTok salida para prompts de hasta 100k tokens; Opus 5.5 USD 4/MTok entrada y
+20/MTok salida. Fuente: [documentación oficial de precios](https://platform.claude.com/docs/en/about-claude/pricing).
+Verificar disponibilidad real de cuenta, precios y credenciales antes del smoke test.
 
-Estimación de escenario, **no uso medido ni garantía de factura**:
+Estimación por escenario, **no es uso medido ni garantía de facturación**:
 
 | Trabajo por conversación | Tokens entrada | Tokens salida | Costo USD |
 | --- | ---: | ---: | ---: |
-| Hasta 70 llamadas Haiku (candidato + analizador + redactor), promedio 1500/300 tokens | 105000 | 21000 | 0.021 |
-| Tres scorings Opus, 15000/1500 tokens cada uno | 45000 | 4500 | 0.270 |
+| Hasta 70 llamadas Haiku (candidato + analizador + escritor), promedio 1500/300 tokens | 105000 | 21000 | 0.021 |
+| Tres ejecuciones de puntuación Opus, 15000/1500 tokens cada una | 45000 | 4500 | 0.270 |
 | Auditor Opus, 15000/1000 tokens | 15000 | 1000 | 0.080 |
 | Total estimado por conversación | | | 0.371 |
 | 33 conversaciones | | | 12.243 |
 
-Fórmula: `(entrada × tarifa_entrada + salida × tarifa_salida) / 1_000_000`, sumada por
-modelo y llamada. Un margen de 50% da aproximadamente **USD 18.40**. Propuesta de techo:
-**USD 20** para el lote, incluyendo smoke y comparaciones de inyección. No se garantizan
-las 33 sesiones si el presupuesto se agota: detener antes de la siguiente llamada.
-Pensamiento, retries, auditoría adicional y contexto más largo consumen presupuesto;
-no asumir descuentos Batch/cache, impuestos incluidos ni límites de tokens ficticios.
-El control monetario y el adaptador real deben existir y probarse antes de usar el flag.
+Fórmula: `(entrada × tasa_entrada + salida × tasa_salida) / 1_000_000`, sumado por modelo/llamada.
+Un margen del 50% da aproximadamente **USD 18.40**. Límite propuesto: **USD 20** para el
+lote, incluyendo smoke y comparaciones de inyección. No garantizar las 33 sesiones si se
+acaba el presupuesto; detenerse antes de la siguiente llamada. El pensamiento, reintentos,
+auditoría extra y contexto más largo consumen presupuesto. No asumir descuentos de
+Batch/caché, impuestos incluidos ni límites ficticios de tokens. Los controles monetarios
+y el adaptador real deben existir y estar probados antes de usar el flag.
 
-Pendientes para ejecutar G3: aprobación del responsable con techo, factory real auditada,
-credenciales configuradas sin imprimirlas, límites de tokens/reintentos y budget reservation,
-y evidencia de comparación base/ataque para acreditar resistencia a inyección.
+Prerrequisitos G3: aprobación del dueño con un límite, fábrica real auditada, credenciales
+configuradas sin imprimirlas, tokens/reintentos acotados y reserva de presupuesto, y
+evidencia de comparación de línea base/ataque para establecer resistencia a inyecciones.

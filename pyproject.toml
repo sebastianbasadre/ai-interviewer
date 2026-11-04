@@ -13,10 +13,13 @@ dependencies = [
   "fastapi==0.162.0",
   "uvicorn==0.54.0",
   "PyYAML==6.0.3",
+  "langdetect==1.0.9",
 ]
 
 [project.optional-dependencies]
 realtime = ["pipecat-ai==1.15.0"]
+media = ["pipecat-ai[webrtc,whisper,piper,tavus,silero]==1.15.0"]
+llm = ["httpx==0.28.1"]
 test = ["pytest==9.2.0", "pytest-asyncio==1.4.1.post1", "httpx==0.28.1"]
 
 [tool.hatch.build.targets.wheel]

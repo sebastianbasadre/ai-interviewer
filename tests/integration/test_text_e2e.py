@@ -93,7 +93,7 @@ def test_real_engine_storage_api_consent_to_report_and_deletion(tmp_path):
             turns = asyncio.run(store.transcript(interview_id))
             assert len({turn.id for turn in turns}) == len(turns)
             report = asyncio.run(store.get_report(interview_id))
-            assert "Recomendación" in render_html(report, turns)
+            assert "Recommendation" in render_html(report, turns)
             assert "mock" in render_markdown(report, turns)
             assert client.post(f"/session/{interview_id}/survey", json={"clarity": 4, "fairness": 4, "comment": "Prueba sintética"}).status_code == 200
             assert client.delete(f"/admin/interviews/{interview_id}", headers=ADMIN).status_code == 204

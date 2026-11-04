@@ -11,6 +11,8 @@ from ai_interviewer.contracts import (
     RoleSpec, SessionSnapshot, Turn,
 )
 from ai_interviewer.engine.llm import AnswerAnalysis
+from ai_interviewer.engine.preferences import replay_preferences, is_preference_reply, preference_language
+from ai_interviewer.engine.language import detect_language, interview_text, language_preference
 from ai_interviewer.engine.safety import has_sensitive, is_injection, normalized, safe_text
 
 
@@ -33,10 +35,15 @@ class OfflineAnswerAnalyzer:
 class StructuredInterviewEngine:
     def __init__(self, analyzer: AnswerAnalyzer | None = None,
                  question_writer: QuestionWriter | None = None, *, max_minutes: int = 30,
+                 mock_single_followup: bool = False, context_first: bool = False, auto_language: bool = False,
                  now: Callable[[], datetime] | None = None, llm_timeout: float = 5):
         if not 1 <= max_minutes <= 30:
             raise ValueError("max_minutes must be between 1 and 30")
         self.analyzer = analyzer or OfflineAnswerAnalyzer()
+        self.mock_single_followup = mock_single_followup and isinstance(self.analyzer, OfflineAnswerAnalyzer)
+        self.context_first = context_first
+        self.auto_language = auto_language
+        self.language = "en"
         self.question_writer = question_writer
         self.max_seconds = max_minutes * 60
         self.now = now or (lambda: datetime.now(timezone.utc))
@@ -55,9 +62,11 @@ class StructuredInterviewEngine:
         if self.role is not None:
             raise RuntimeError("engine already started")
         self.role, self.candidate = role.model_copy(deep=True), candidate.model_copy(deep=True)
-        self.state = InterviewState(phase=InterviewPhase.INTRO)
+        self.state = InterviewState(phase=InterviewPhase.WARMUP if self.context_first else InterviewPhase.INTRO)
         self._deadline = self.now() + timedelta(seconds=self.max_seconds)
-        return self._say("Soy un entrevistador de IA; esta entrevista se graba y la revisa una persona. ¿Podemos empezar?")
+        if self.context_first:
+            return self._say("I am an AI interviewer. This interview is recorded as a transcript and reviewed by a person. To start, tell me about your professional background: what is your current role and what product responsibilities do you have? You can answer in English or Spanish.")
+        return self._say("I am an AI interviewer. This interview is recorded as a transcript and reviewed by a person. Shall we start?")
 
     async def restore(self, role: RoleSpec, candidate: Candidate, snapshot: SessionSnapshot,
                       turns: list[Turn]) -> None:
@@ -83,8 +92,14 @@ class StructuredInterviewEngine:
         self.role, self.candidate = role.model_copy(deep=True), candidate.model_copy(deep=True)
         self.state = snapshot.state.model_copy(deep=True)
         self._turns = [turn.model_copy(deep=True) for turn in turns]
+        if self.auto_language:
+            _, preference_ids = replay_preferences(turns, candidate.name)
+            for item in turns:
+                if item.speaker == "candidate":
+                    self.language = (preference_language(item.text, self.language) if item.id in preference_ids
+                                     else detect_language(safe_text(item.text), self.language))
         self._deadline = snapshot.deadline
-        self._last_question = next((turn.text for turn in reversed(turns) if turn.speaker == "interviewer"), "")
+        self._last_question = next((turn.text for turn in reversed(turns) if turn.speaker == "interviewer" and not is_preference_reply(turn.text)), "")
 
     def _require_started(self) -> RoleSpec:
         if self.role is None:
@@ -96,8 +111,10 @@ class StructuredInterviewEngine:
             return self._require_started().competencies[self.state.competency_index].id
         return None
 
-    def _say(self, text: str, flags: list[str] | None = None) -> EngineDecision:
-        self._last_question = text
+    def _say(self, text: str, flags: list[str] | None = None, *, preserve_question: bool = False) -> EngineDecision:
+        text = interview_text(text, self.language, self._require_started()) if self.auto_language else text
+        if not preserve_question:
+            self._last_question = text
         if text:
             self._turns.append(Turn(speaker="interviewer", text=text,
                 ts_start=self.state.elapsed_seconds, ts_end=self.state.elapsed_seconds,
@@ -110,7 +127,7 @@ class StructuredInterviewEngine:
 
     def _finish(self, flag: str) -> EngineDecision:
         self.state = self.state.model_copy(update={"phase": InterviewPhase.DONE})
-        return self._say("Gracias por tu tiempo; terminamos la entrevista. El equipo humano revisará las respuestas.", [flag])
+        return self._say("Thank you for your time. The interview is complete. A human reviewer will review your answers.", [flag])
 
     async def _question(self, base: str, flags: list[str] | None = None) -> EngineDecision:
         flags = list(flags or [])
@@ -134,17 +151,17 @@ class StructuredInterviewEngine:
         phase = self.state.phase
         if phase == InterviewPhase.INTRO:
             self.state = self.state.model_copy(update={"phase": InterviewPhase.WARMUP, "followup_count": 0})
-            return self._say("Para ubicarnos, contame brevemente qué responsabilidades de producto tuviste en una experiencia reciente.", flags)
+            return self._say("Briefly describe your product responsibilities in a recent role.", flags)
         if phase == InterviewPhase.WARMUP:
             self.state = self.state.model_copy(update={"phase": InterviewPhase.COMPETENCIES, "competency_index": 0, "followup_count": 0})
         elif phase == InterviewPhase.COMPETENCIES:
             if self.state.competency_index == len(role.competencies) - 1:
                 self.state = self.state.model_copy(update={"phase": InterviewPhase.CANDIDATE_QUESTIONS, "followup_count": 0})
-                return self._say("¿Qué te gustaría preguntarle al equipo sobre el rol o la empresa?", flags)
+                return self._say("What would you like to ask the team about the role or the company?", flags)
             self.state = self.state.model_copy(update={"competency_index": self.state.competency_index + 1, "followup_count": 0})
         elif phase == InterviewPhase.CANDIDATE_QUESTIONS:
             self.state = self.state.model_copy(update={"phase": InterviewPhase.CLOSING})
-            return self._say("Gracias por compartir tu experiencia. El equipo humano revisará la entrevista y responderá las consultas pendientes.", flags)
+            return self._say("Thank you for sharing your experience. The team will review this interview and answer your outstanding questions.", flags)
         elif phase == InterviewPhase.CLOSING:
             return self._finish("completed")
         return await self._question(role.competencies[self.state.competency_index].questions[0].text, flags)
@@ -173,12 +190,23 @@ class StructuredInterviewEngine:
         self._turns.append(turn.model_copy(deep=True))
         if self._expired():
             return self._finish("duration_limit")
+        if self.auto_language and not is_injection(turn.text):
+            self.language = detect_language(safe_text(turn.text), self.language)
+            if language_preference(turn.text):
+                return self._say(self._last_question, ["language_preference"])
         text = normalized(turn.text).strip(" .!¿?¡")
         if re.search(r"\b(quiero terminar|terminemos|prefiero terminar|no quiero seguir|stop interview|end the interview|i want to stop)\b", text):
             return self._finish("candidate_end")
         injection = is_injection(turn.text)
         sensitive = has_sensitive(turn.text)
         flags = (["injection_attempt"] if injection else []) + (["sensitive_data_excluded"] if sensitive else [])
+        if not injection:
+            preference, _ = replay_preferences(self._turns[:-1], self.candidate.name)
+            reply_language = preference_language(turn.text, self.language) if self.auto_language else self.language
+            acknowledgement = preference.handle(turn.text, reply_language)
+            if acknowledgement:
+                self.language = reply_language
+                return self._say(acknowledgement, flags + ["name_preference"], preserve_question=True)
         phase_limit = 180 if self.state.phase == InterviewPhase.COMPETENCIES else 90
         if self._phase_elapsed() >= phase_limit:
             return await self._advance(flags + ["phase_time_limit"])
@@ -189,16 +217,32 @@ class StructuredInterviewEngine:
                 return await self._advance(flags)
             # Exact confirmed keys only; no generation or fuzzy company facts.
             answer = role.company_info.get(text)
-            return await self._followup(answer or "Esa información la va a responder el equipo humano. ¿Tenés otra consulta?", flags)
+            return await self._followup(answer or "The team will answer that question. Do you have another question?", flags)
         if self.state.phase != InterviewPhase.COMPETENCIES:
             return await self._advance(flags)
         if injection:
-            return await self._followup("Sigamos con tu experiencia profesional; contame un caso concreto relacionado con la pregunta.", flags)
+            return await self._followup("Let us focus on your professional experience. Tell me about a specific example related to the question.", flags)
         cleaned = safe_text(turn.text)
         if not cleaned:
-            return await self._followup("Volvamos al trabajo de producto; contame una situación concreta, qué hiciste y qué resultado observaste.", flags)
+            return await self._followup("Let us return to product work. Describe a specific situation, what you did and the outcome you observed.", flags)
+        if self.mock_single_followup and self.state.followup_count >= 1:
+            return await self._advance(flags + ["mock_script_advance"])
+        # A short followup (e.g. "bajó 20%") can complete the earlier STAR example.
+        # Use only this competency, sanitize each answer, and retain bounded excerpts
+        # of every contribution so a long first answer cannot hide the latest one.
+        _, preference_turns = replay_preferences(self._turns, self.candidate.name)
+        answers = [safe_text(item.text) for item in self._turns
+                   if item.speaker == "candidate" and item.id not in preference_turns and item.phase == InterviewPhase.COMPETENCIES
+                   and item.competency_id == self._competency_id()]
+        answers = [item for item in answers if item][-3:]
+        per_answer = max(1, (3900 - 40 * len(answers)) // len(answers))
+        context = "\n".join(f"Answer {index + 1}: {item[:per_answer]}"
+                            for index, item in enumerate(answers))
+        base_question = next((item.text for item in self._turns
+                              if item.speaker == "interviewer" and item.phase == InterviewPhase.COMPETENCIES
+                              and item.competency_id == self._competency_id()), self._last_question)
         try:
-            analysis = await asyncio.wait_for(self.analyzer.analyze(cleaned, self._last_question), self.llm_timeout)
+            analysis = await asyncio.wait_for(self.analyzer.analyze(context, base_question), self.llm_timeout)
             if not isinstance(analysis, AnswerAnalysis):
                 raise ValueError("invalid analyzer response")
         except Exception:  # Provider failures degrade safely; cancellation still propagates.
@@ -208,13 +252,22 @@ class StructuredInterviewEngine:
             return self._finish("candidate_end")
         if analysis.injection_attempt:
             flags.append("injection_attempt")
-            return await self._followup("Sigamos con un ejemplo de tu experiencia profesional relacionado con la pregunta.", flags)
+            return await self._followup("Let us continue with a specific example from your professional experience related to the question.", flags)
         if analysis.request == "repeat":
             return await self._followup(self._last_question, flags + ["repeat_requested"])
         if not analysis.on_topic:
-            return await self._followup("Volvamos a la pregunta; elegí una situación concreta vinculada con esa decisión de producto.", flags + ["off_topic"])
+            return await self._followup("Let us return to the question. Choose a specific situation related to that product decision.", flags + ["off_topic"])
         if not analysis.concrete_example:
-            return await self._followup("¿Podés darme un ejemplo concreto con la situación, qué hiciste vos y qué resultado o aprendizaje hubo?", flags + ["star_followup"])
+            if self.mock_single_followup:
+                return await self._followup("To complete this example, what outcome did you observe or what did you learn? We will then move to the next competency.", flags + ["star_followup"])
+            focused_questions = {
+                "situation": "Which specific project or situation was this? What problem did you need to solve?",
+                "action": "What did you personally do in that situation, and why did you choose that action?",
+                "result": "What specific outcome did you observe after that action, or what did you learn?",
+            }
+            if analysis.missing_component in focused_questions:
+                return await self._followup(focused_questions[analysis.missing_component], flags + ["star_followup"])
+            return await self._followup("Could you give a specific example describing the situation, your own actions and the outcome or learning?", flags + ["star_followup"])
         return await self._advance(flags)
 
     async def on_event(self, event: EngineEvent) -> EngineDecision:
@@ -230,4 +283,4 @@ class StructuredInterviewEngine:
             return self._finish("duration_limit")
         if self._phase_elapsed() >= (180 if self.state.phase == InterviewPhase.COMPETENCIES else 90):
             return await self._advance(["phase_time_limit"])
-        return await self._followup(self._last_question or "¿Seguís ahí?", ["silence_timeout"])
+        return await self._followup(self._last_question or "Are you still there?", ["silence_timeout"])

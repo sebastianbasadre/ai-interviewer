@@ -19,7 +19,8 @@ def main() -> int:
         print("Startup failed; verify role files and local storage permissions.", file=sys.stderr)
         return 2
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=8000, workers=1, access_log=False)
+    options = {"port": 8000, **getattr(getattr(app, "state", None), "server_options", {})}
+    uvicorn.run(app, host="127.0.0.1", workers=1, access_log=False, **options)
     return 0
 
 

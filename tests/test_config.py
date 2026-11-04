@@ -22,3 +22,20 @@ def test_secret_is_hidden_from_repr_and_missing_check_names_only():
 def test_session_cost_cap_cannot_exceed_thirty_minutes(minutes):
     with pytest.raises(ValidationError):
         Settings(_env_file=None, interview_max_minutes=minutes)
+
+
+def test_tavus_face_setting_supports_existing_replica_name_but_prefers_face():
+    old = Settings(_env_file=None, tavus_replica_id="legacy_face")
+    assert old.resolved_tavus_face_id.get_secret_value() == "legacy_face"
+    both = Settings(_env_file=None, tavus_face_id="new_face", tavus_replica_id="legacy_face")
+    assert both.resolved_tavus_face_id.get_secret_value() == "new_face"
+    blank = Settings(_env_file=None, tavus_face_id=" ", tavus_replica_id="legacy_face")
+    assert blank.resolved_tavus_face_id.get_secret_value() == "legacy_face"
+    assert "new_face" not in repr(both)
+
+
+def test_missing_tavus_settings_use_current_names_and_require_echo_pal():
+    assert set(Settings(_env_file=None).missing_tavus_settings()) == {
+        "TAVUS_API_KEY", "TAVUS_FACE_ID", "TAVUS_PAL_ID"}
+    configured = Settings(_env_file=None, tavus_api_key="key", tavus_face_id="face", tavus_pal_id="pal")
+    assert configured.missing_tavus_settings() == []

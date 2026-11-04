@@ -35,7 +35,7 @@ class Engine:
         return EngineDecision(state=self.state, text=text, end_session=self.state.phase == InterviewPhase.DONE)
 
     async def start(self, role, candidate):
-        return self.decision("Soy un entrevistador de IA; esta entrevista se graba y la revisa una persona. Contame sobre tu experiencia.")
+        return self.decision("Soy un AI interviewer; esta entrevista se graba y la revisa una persona. Contame sobre tu experiencia.")
 
     async def on_candidate_turn(self, turn):
         self.turns.append(turn)
@@ -87,16 +87,16 @@ def test_link_consent_text_finish_survey_and_delete(setup):
     client, app, store, clock, role, _ = setup
     interview_id, link = invite(client, role)
     page = client.get(link)
-    assert "entrevistador de IA" in page.text
+    assert "AI interviewer" in page.text
     assert "Equipo de prueba" in page.text
-    assert "30 días" in page.text
+    assert "30 days" in page.text
     assert client.get(link + "/room").status_code == 403
     assert client.post(link + "/start").status_code == 409
     assert client.post(link + "/consent", json={"accepted": False}).status_code == 422
     assert client.post(link + "/consent", json={"accepted": True}).status_code == 200
     room = client.get(link + "/room")
     assert room.status_code == 200
-    assert "Audio y avatar todavía no están disponibles" in room.text
+    assert "Audio and avatar are not available yet" in room.text
     response = client.post(link + "/start")
     assert response.status_code == 200
     assert "HttpOnly" in response.headers["set-cookie"]
@@ -276,7 +276,7 @@ def test_finish_failure_closes_store_and_discards_mutated_engine(setup, monkeypa
             monkeypatch.setattr(store, "save_progress", broken_progress)
         response = failing.post(f"/session/{interview_id}/finish")
         assert response.status_code == 503
-        assert "finalizó" in response.json()["detail"]
+        assert "ended" in response.json()["detail"]
         interview = failing.portal.call(store.get, interview_id)
         assert interview.status == "aborted" and interview.ended_at == clock()
         assert failing.post(f"/session/{interview_id}/turn", json={"text": "No continuar"}).status_code == 409

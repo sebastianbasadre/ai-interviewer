@@ -66,6 +66,10 @@ class SQLiteSessionStore:
                 interview_id TEXT PRIMARY KEY REFERENCES interviews(id) ON DELETE CASCADE,
                 body TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS report_states (
+                interview_id TEXT PRIMARY KEY REFERENCES interviews(id) ON DELETE CASCADE,
+                status TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS session_keys (
                 interview_id TEXT PRIMARY KEY REFERENCES interviews(id) ON DELETE CASCADE,
                 key_hash TEXT NOT NULL, expires_at TEXT NOT NULL
@@ -175,6 +179,11 @@ class SQLiteSessionStore:
                 except Exception:
                     pass
                 raise
+
+    async def has_consent_version(self, interview_id: UUID, version: str) -> bool:
+        with self._lock:
+            row = self._db.execute("SELECT body FROM consent WHERE interview_id=?", (str(interview_id),)).fetchone()
+            return bool(row and ConsentRecord.model_validate_json(row["body"]).text_version == version)
 
     async def issue_session_key(self, interview_id: UUID, expires_at: datetime) -> str:
         with self._lock, self._db:
@@ -326,6 +335,35 @@ class SQLiteSessionStore:
         with self._lock:
             row = self._db.execute("SELECT body FROM reports WHERE interview_id=?", (str(interview_id),)).fetchone()
             return InterviewReport.model_validate_json(row["body"]) if row else None
+
+    async def set_report_state(self, interview_id: UUID, status: str) -> None:
+        if status not in {"queued", "running", "failed"}:
+            raise StorageError("invalid report status")
+        with self._lock, self._db:
+            self._get(interview_id)
+            self._db.execute("INSERT OR REPLACE INTO report_states VALUES(?,?)", (str(interview_id), status))
+
+    async def review_list(self, limit: int = 100) -> list[dict]:
+        with self._lock:
+            rows = self._db.execute("""SELECT i.body, r.body AS report_body, s.status AS report_status
+                FROM interviews i LEFT JOIN reports r ON r.interview_id=i.id
+                LEFT JOIN report_states s ON s.interview_id=i.id ORDER BY i.rowid DESC LIMIT ?""", (limit,)).fetchall()
+            result = []
+            for row in rows:
+                interview = Interview.model_validate_json(row["body"])
+                report = InterviewReport.model_validate_json(row["report_body"]) if row["report_body"] else None
+                result.append({"id": str(interview.id), "name": interview.candidate.name,
+                    "role_id": interview.role_id, "status": interview.status,
+                    "created_at": interview.created_at.isoformat(),
+                    "report_status": "ready" if report else (row["report_status"] or "not_generated"),
+                    "report_kind": ("mock" if "mock_scoring" in report.flags else "anthropic") if report else None})
+            return result
+
+    async def recover_report_states(self):
+        with self._lock, self._db:
+            self._db.execute("""UPDATE report_states SET status='failed'
+                WHERE status IN ('queued','running') AND interview_id NOT IN
+                (SELECT interview_id FROM reports)""")
 
     async def save_survey(self, interview_id: UUID, clarity: int, fairness: int, comment: str) -> None:
         if not 1 <= clarity <= 5 or not 1 <= fairness <= 5 or len(comment) > 2000:

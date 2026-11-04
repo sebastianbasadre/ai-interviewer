@@ -1,21 +1,27 @@
-# ADR-003: consentimiento y borrado del conjunto de datos
+# ADR-003: consentimiento y eliminación completa del conjunto de datos
 
-Estado: aceptado en G1 por el responsable. Fecha: 2026-11-02.
+Estado: aceptado por el dueño del proyecto en G1. Fecha: 2026-11-02.
 
 ## Contexto
-Una entrevista contiene datos personales, audio y texto; el piloto necesita límites simples
-y borrado comprobable. Este ADR define ingeniería, no sustituye revisión legal.
+
+Una entrevista contiene datos personales, audio y texto. El piloto necesita límites simples
+y eliminación verificable. Este ADR define requisitos de ingeniería; no reemplaza la
+revisión legal.
 
 ## Decisión
-Consentimiento versionado antes de captura o llamadas a proveedores. Tokens de invitación
-aleatorios de 32 bytes, hash persistido, siete días y claim atómico de un solo uso. IP con HMAC.
-Retención predeterminada 30 días; borrar candidato, consentimiento, turnos, reporte y archivos,
-manteniendo solo estadísticas anónimas. Borrado a pedido usa la misma operación idempotente.
-El deadline se toma del cierre, o creación si no llegó a iniciarse. Backups deben vencer y
-respetar un registro de borrados al restaurar. No almacenar datos sensibles en logs.
+
+Requerir consentimiento versionado antes de la captura o las llamadas a proveedores. Usar
+tokens de invitación aleatorios de 32 bytes, persistir solo sus hashes, expirarlos a los
+siete días y reclamarlos atómicamente para uso único. Proteger las direcciones IP con HMAC.
+La retención por defecto es de 30 días: eliminar candidato, consentimiento, turnos, informe
+y archivos, conservando solo estadísticas anónimas. La eliminación solicitada usa la misma
+operación idempotente. Calcular el plazo desde el cierre, o la creación si la entrevista
+nunca comenzó. Los respaldos deben expirar y respetar un registro de eliminaciones al
+restaurar. Nunca almacenar datos sensibles en logs.
 
 ## Consecuencias
-Storage necesita tests de consentimiento, concurrencia, retención y borrado de archivos.
-El piloto no comienza hasta documentar quién accede, proveedores, contacto, política de
-backups y aviso de IA. Grabación persistida de video queda pendiente de definición en G1.
 
+El almacenamiento necesita pruebas de consentimiento, concurrencia, retención y eliminación
+de archivos. El piloto no puede comenzar hasta que el acceso a datos, los proveedores, el
+contacto de privacidad, la política de respaldo y la divulgación de IA estén documentados.
+La grabación de video persistida espera una decisión de alcance G1.
