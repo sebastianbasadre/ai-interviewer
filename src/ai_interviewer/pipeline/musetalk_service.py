@@ -8,6 +8,16 @@ transport.
 MuseTalk is an optional dependency.  If it is not installed the class raises
 MediaUnavailable at construction time, never at import time.
 
+Protocol note: contracts.AvatarService defines start/send_audio/interrupt/close
+for a push-based integration. MuseTalkVideoService is instead a Pipecat
+FrameProcessor, matching how TavusVideoService integrates with the pipeline.
+Both patterns are deliberate deviations from the protocol; the protocol should
+be updated to reflect the FrameProcessor-based integration in a future ADR.
+
+Pipecat API note: OutputImageRawFrame constructor signature (image, size, format)
+is assumed from the 1.15.x source. Verify against installed pipecat before first
+real run: python -c "from pipecat.frames.frames import OutputImageRawFrame; help(OutputImageRawFrame)"
+
 Design rules (from CLAUDE.md):
 - Never log audio content, candidate data or model internals.
 - JSON logs only; one line per structural event.
@@ -46,7 +56,8 @@ class MuseTalkVideoService:
     # Pipecat 1.15 frame types are imported lazily inside methods to allow this
     # module to be imported in test environments where pipecat is not installed.
 
-    def __init__(self, model, *, fps: int = 25, chunk_ms: int = 200):
+    def __init__(self, model, *, fps: int = 25, chunk_ms: int = 200,
+                 frame_width: int = 512, frame_height: int = 512):
         try:
             from pipecat.processors.frame_processor import FrameProcessor  # noqa: F401
         except ImportError as exc:
@@ -69,6 +80,7 @@ class MuseTalkVideoService:
         self._model = model
         self._fps = fps
         self._chunk_ms = chunk_ms
+        self._frame_size = (frame_width, frame_height)
         self._interrupted = False
         self._audio_buffer: deque[bytes] = deque()
         self._sample_rate: int = 24000  # updated on first audio frame
@@ -121,7 +133,7 @@ class MuseTalkVideoService:
                             for vf in video_frames:
                                 img_frame = OutputImageRawFrame(
                                     image=vf,
-                                    size=(512, 512),
+                                    size=service._frame_size,
                                     format="BGR",
                                 )
                                 await self.push_frame(img_frame, direction)
@@ -161,19 +173,9 @@ class MuseTalkVideoService:
                 result.append(bytes(frame))
         return result
 
-    # -------------------------------------------------------------------------
-    # Pipeline integration: expose the inner FrameProcessor so the pipeline
-    # builder can append it to the processors list directly, matching the
-    # pattern used by TavusVideoService.
-    # -------------------------------------------------------------------------
-
-    def __iter__(self):
-        """Allow ``processors.append(musetalk_service)`` to work transparently."""
-        yield self._processor
-
     @property
     def processor(self):
-        """Direct access to the inner FrameProcessor."""
+        """The inner FrameProcessor to append to the Pipecat pipeline."""
         return self._processor
 
 

@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # ---------------------------------------------------------------------------
@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     musetalk_avatar_image: Path | None = None
     musetalk_fps: int = Field(default=25, ge=10, le=30)
     musetalk_enabled: bool = False
+    # MuseTalk output resolution — must match what the model actually produces.
+    # Verify with: model.inference(sample, fps=25)[0].shape after first real run.
+    musetalk_video_width: int = Field(default=512, ge=64, le=1920)
+    musetalk_video_height: int = Field(default=512, ge=64, le=1080)
     public_base_url: str = "http://localhost:8000"
     allow_mock_lan_http: bool = False
     realtime_enabled: bool = False
@@ -69,6 +73,22 @@ class Settings(BaseSettings):
     @classmethod
     def empty_tls_path(cls, value):
         return None if value == "" else value
+
+    @field_validator("musetalk_avatar_image", mode="after")
+    @classmethod
+    def avatar_image_must_exist(cls, value):
+        if value is not None and not value.is_file():
+            raise ValueError(f"MUSETALK_AVATAR_IMAGE does not exist or is not a file: {value}")
+        return value
+
+    @model_validator(mode="after")
+    def no_dual_avatar(self) -> "Settings":
+        if self.tavus_enabled and self.musetalk_enabled:
+            raise ValueError(
+                "TAVUS_ENABLED and MUSETALK_ENABLED cannot both be true. "
+                "Set only one avatar provider."
+            )
+        return self
 
     @property
     def resolved_tavus_face_id(self) -> SecretStr | None:

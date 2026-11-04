@@ -159,13 +159,14 @@ class MediaManager:
                 remaining = min(remaining, self.settings.tavus_max_minutes_per_session * 60)
             if remaining < 1:
                 raise MediaUnavailable("Interview time limit reached.")
-            video_enabled = self.settings.tavus_enabled or (
-                self.settings.musetalk_enabled and self.settings.avatar_mode == "musetalk"
-            )
+            musetalk_active = self.settings.musetalk_enabled and self.settings.avatar_mode == "musetalk"
+            video_enabled = self.settings.tavus_enabled or musetalk_active
+            video_width = self.settings.musetalk_video_width if musetalk_active else 1280
+            video_height = self.settings.musetalk_video_height if musetalk_active else 720
             transport = SmallWebRTCTransport(peer.connection, TransportParams(
                 audio_in_enabled=True, audio_out_enabled=True,
                 video_out_enabled=video_enabled, video_out_is_live=True,
-                video_out_width=1280, video_out_height=720,
+                video_out_width=video_width, video_out_height=video_height,
                 audio_out_auto_silence=not video_enabled))
             class BilingualPiper(PiperTTSService):
                 async def run_tts(self, text, context_id):
@@ -183,11 +184,13 @@ class MediaManager:
                     from ai_interviewer.pipeline.tavus_compat import create_tavus_video_service
                     processors.append(create_tavus_video_service(self.settings, session,
                                                                  max_duration_seconds=int(remaining)))
-                if self.settings.musetalk_enabled and self.settings.avatar_mode == "musetalk":
+                if musetalk_active:
                     from ai_interviewer.pipeline.musetalk_service import MuseTalkVideoService
                     musetalk_service = MuseTalkVideoService(
                         self._musetalk,
                         fps=self.settings.musetalk_fps,
+                        frame_width=self.settings.musetalk_video_width,
+                        frame_height=self.settings.musetalk_video_height,
                     )
                     processors.append(musetalk_service.processor)
                 processors.append(transport.output())
