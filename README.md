@@ -1,89 +1,82 @@
 # AI Interviewer
 
-Entrevistas estructuradas para PM/PO con revisión humana. El flujo actual proporciona un
-**flujo de demostración**: consentimiento, sesión, transcripción e informe. Permite audio
-local con Whisper/Piper y un avatar opcional de Tavus, verificado en una sesión sintética
-con video 1280×720. La puntuación simulada deja los puntajes como `null`; la puntuación
-opcional con Claude genera puntajes con evidencia para revisión humana y requiere validación
-piloto.
-Configuración de audio/avatar y límites: [docs/MEDIA_SETUP.md](docs/MEDIA_SETUP.md).
-Análisis de respuestas con Claude: [docs/CONVERSATION_SETUP.md](docs/CONVERSATION_SETUP.md).
-Informes reales e interfaz de revisor: [docs/REPORTS.md](docs/REPORTS.md).
+Structured PM/PO interviews with human review. The current runtime provides a
+**demo workflow**: consent, session, transcript and report. It can enable real local
+Whisper/Piper audio and an optional Tavus avatar, verified in a synthetic session
+with 1280x720 video. Mock scoring leaves scores `null`; optional Claude scoring produces
+scores with evidence for human review and requires pilot validation.
+Audio/avatar setup and limits: [docs/MEDIA_SETUP.md](docs/MEDIA_SETUP.md).
+Optional Claude answer analysis: [docs/CONVERSATION_SETUP.md](docs/CONVERSATION_SETUP.md).
+Real reports and the reviewer interface: [docs/REPORTS.md](docs/REPORTS.md).
 
-## Ejecutar en el homelab
+## Run in the homelab
 
-Entorno verificado: Windows 11, WSL2 NVIDIA-Workbench, Python 3.12 y RTX 3090.
-Ejecutar los siguientes comandos dentro de WSL2 desde la raíz del repositorio. El lanzador
-escucha únicamente en `127.0.0.1:8000`, con un solo worker y sin registros de acceso,
-para proteger los tokens de invitación.
+Verified environment: Windows 11, WSL2 NVIDIA-Workbench, Python 3.12 and RTX 3090.
+Run the following commands inside WSL2 from the checkout root. The launcher listens
+only on `127.0.0.1:8000`, with one worker and no access logs, to protect invitation tokens.
 
 ```bash
 make install-test
-cp .env.example .env  # solo la primera vez; no sobreescribir configuración existente
+cp .env.example .env  # first run only; do not overwrite existing configuration
 ```
 
-Establecer valores independientes para `ADMIN_API_KEY` e `IP_HASH_SECRET` en `.env`, cada
-uno con al menos 32 caracteres aleatorios. Configurar `PRIVACY_CONTACT` con la persona
-real responsable de las solicitudes de eliminación. Generar secretos con un gestor de
-secretos; no pegarlos en commits, logs ni chats. Mantener `APP_MODE=mock`,
-`AVATAR_MODE=mock` y `PUBLIC_BASE_URL=http://localhost:8000`. Este flujo no requiere claves
-de Anthropic, OpenAI ni Tavus. El inicio rechaza secretos faltantes o cortos. Los errores
-muestran nombres de campos, nunca valores.
+Set independent `ADMIN_API_KEY` and `IP_HASH_SECRET` values in `.env`, each containing
+at least 32 random characters. Set `PRIVACY_CONTACT` to the actual person responsible
+for deletion requests. Generate secrets with a secret manager; do not paste them into
+commits, logs or chats. Keep `APP_MODE=mock`, `AVATAR_MODE=mock` and
+`PUBLIC_BASE_URL=http://localhost:8000`. This workflow needs no Anthropic, OpenAI or
+Tavus keys. Startup rejects missing or short secrets. Errors show field names, never values.
 
 ```bash
 make test
 make dev
 ```
 
-Para un entorno virtual en otra ruta, usar `make VENV=/ruta/al/venv test` y el mismo
-parámetro para `dev`. El entorno del homelab está en
-`/home/workbench/.venvs/ai-interviewer`. Usar un túnel SSH al puerto local al abrir la
-aplicación desde otra máquina; no exponer este lanzador directamente a la LAN.
-La URL pública debe coincidir con el origen del navegador. Fuera de localhost, la API
-requiere HTTPS.
+For a virtual environment at another path, use `make VENV=/path/to/venv test` and the
+same parameter for `dev`. The homelab environment is at
+`/home/workbench/.venvs/ai-interviewer`. Use an SSH tunnel to the local port when opening
+the application from another machine; do not expose this launcher directly to the LAN.
+The public URL must match the browser's origin. Outside localhost, the API requires HTTPS.
 
-Para una demo simulada autorizada por HTTP en una LAN privada, habilitar
-`ALLOW_MOCK_LAN_HTTP=true` y establecer `PUBLIC_BASE_URL=http://192.168.2.6:8000`. Esta
-excepción acepta únicamente IPs privadas RFC1918 con la app y el avatar en modo simulado;
-otros orígenes aún requieren HTTPS. El lanzador sigue escuchando en loopback: configurar
-el reenvío de puertos del host y una regla de firewall restringida a la subred local.
+For an authorized mock demo over HTTP on a private LAN, enable `ALLOW_MOCK_LAN_HTTP=true`
+and set `PUBLIC_BASE_URL=http://192.168.2.6:8000`. This exception accepts only RFC1918
+private IPs with both app and avatar in mock mode; other origins still require HTTPS.
+The launcher still listens on loopback: configure host port forwarding and a firewall
+rule restricted to the local subnet.
 
-## Recorrido sintético
+## Synthetic walkthrough
 
-1. Abrir `/` y confirmar `mode: mock`. Crear una invitación con
-   `POST /admin/interviews`, cabecera `X-Admin-Key`, y JSON
+1. Open `/` and confirm `mode: mock`. Create an invitation with
+   `POST /admin/interviews`, header `X-Admin-Key`, and JSON
    `{"role_id":"pm_po","name":"Synthetic","email":"synthetic@example.invalid"}`.
-   Configurar la cabecera en un cliente HTTP privado; mantener el secreto fuera del historial
-   de comandos.
-2. Abrir el `link` devuelto, aceptar el consentimiento y entrar a la sala de texto.
-3. Completar o finalizar la sesión. Generar el informe con
-   `POST /admin/interviews/{id}/report` usando la misma cabecera de administrador.
-4. Leerlo con `GET` en esa ruta. Debe contener `mock_scoring` y seis puntajes `null`.
-   Eliminar datos de prueba con `DELETE /admin/interviews/{id}`.
+   Set the header in a private HTTP client; keep the secret out of command history.
+2. Open the returned `link`, accept consent and enter the text room.
+3. Complete or end the session. Generate the report using
+   `POST /admin/interviews/{id}/report` with the same admin header.
+4. Read it with `GET` on that path. It should contain `mock_scoring` and six `null`
+   scores. Delete test data using `DELETE /admin/interviews/{id}`.
 
-El link es una credencial: no compartirlo ni registrarlo. Los endpoints de administración
-requieren autenticación incluso en modo simulado. Las entrevistas no pueden comenzar sin
-consentimiento. SQLite y los archivos se almacenan en `DATA_DIR`, con retención configurable
-(30 días por defecto).
+The link is a credential: do not share or log it. Admin endpoints require authentication
+even in mock mode. Interviews cannot start without consent. SQLite and files are stored
+in `DATA_DIR`, with configurable retention (30 days by default).
 
-## Evaluaciones y audio/video
+## Evaluations and audio/video
 
 ```bash
-make eval        # harness offline; sin proveedores ni costos de tokens
-make install     # también instala Pipecat 1.15.0 para pruebas de frames opcionales
+make eval        # offline harness; no providers or token costs
+make install     # also installs Pipecat 1.15.0 for optional frame tests
 ```
 
-El harness offline verifica estructura y seguridad usando dobles de prueba. Las métricas
-semánticas no evaluadas no se presentan como aprobadas. Las evaluaciones reales con LLM
-grande requieren G3 y una estimación de costos. `APP_MODE=real` y `make dev-tavus`
-permanecen bloqueados hasta la integración con proveedores y las compuertas correspondientes.
-Tavus requiere G4 antes de consumir minutos.
+The offline harness checks structure and safety using test doubles. Unevaluated semantic
+metrics are not presented as passing. Large real LLM evaluations require G3 and a cost
+estimate. `APP_MODE=real` and `make dev-tavus` remain blocked pending provider integration
+and the relevant gates. Tavus requires G4 before consuming minutes.
 
-La sala soporta WebRTC opcional con STT/TTS local. Se verificó audio de Chrome por LAN,
-incluyendo transcripción sintética y respuestas habladas. La grabación audiovisual,
-la latencia p50/p95, la sincronización medida y la calidad semántica están pendientes.
-No declarar preparación piloto hasta que las evaluaciones, la revisión de privacidad y G5
-estén completas; no usar con candidatos reales aún.
+The room supports optional WebRTC with local STT/TTS. Chrome audio over the LAN was
+verified, including synthetic transcription and spoken responses. Audiovisual recording,
+p50/p95 latency, measured synchronization and semantic quality remain pending. Do not
+claim pilot readiness until evaluations, privacy review and G5 are complete; do not use
+with real candidates yet.
 
-Arquitectura y decisiones: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
-Estado y compuertas: [docs/STATUS.md](docs/STATUS.md). Reglas de agentes: [CLAUDE.md](CLAUDE.md).
+Architecture and decisions: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+Status and gates: [docs/STATUS.md](docs/STATUS.md). Agent rules: [CLAUDE.md](CLAUDE.md).
