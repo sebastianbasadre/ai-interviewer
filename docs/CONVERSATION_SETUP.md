@@ -1,35 +1,33 @@
-# Análisis de respuestas con Claude
+# Claude answer analysis
 
-## Alcance
+## Scope
 
-`CONVERSATION_ENABLED=true` conecta el analizador del motor con Claude Haiku 5.5. Claude
-clasifica relevancia, ejemplos concretos, solicitudes de repetir/finalizar e intentos de
-inyección; identifica situación, acción personal o resultado faltantes. El motor selecciona
-el seguimiento correspondiente de redacciones fijas y retiene el control de las fases,
-seis competencias, dos seguimientos por competencia y el tiempo. Tavus continúa renderizando
-el habla de Piper en modo Echo.
+`CONVERSATION_ENABLED=true` connects the engine's analyzer to Claude Haiku 5.5. Claude
+classifies relevance, concrete examples, requests to repeat/end, and injection attempts;
+it identifies missing situation, personal action or outcome. The engine selects the
+corresponding follow-up from fixed wording and retains control of phases, six competencies,
+two follow-ups per competency and timing. Tavus continues rendering Piper speech in Echo mode.
 
-Analiza las aclaraciones junto con las respuestas anteriores para esa competencia. Un
-resultado breve puede completar el ejemplo original, incluso después de reconectar. El
-contexto retiene hasta tres contribuciones filtradas dentro de un límite total de texto
-y se reinicia para la siguiente competencia. Excluye perfiles de candidatos y otras
-entrevistas. El filtro léxico conservador no garantiza la anonimización del texto libre.
+Analyze clarifications together with previous answers for that competency. A short outcome
+can complete the original example, including after reconnecting. Context retains up to
+three filtered contributions within a total text limit and resets for the next competency.
+It excludes candidate profiles and other interviews. The conservative lexical filter does
+not guarantee anonymization of free text.
 
-Configurar la puntuación por separado: `SCORING_ENABLED=false` usa puntajes simulados
-(`null` para cada competencia). La evaluación opcional con Opus y la revisión humana se
-describen en REPORTS.md. El analizador no establece calibración semántica ni preparación G5.
-`APP_MODE=real` permanece bloqueado; habilitar los proveedores explícitamente dentro de
-la demo.
+Configure scoring separately: `SCORING_ENABLED=false` uses mock scores (`null` for every
+competency). Optional Opus evaluation and human review are described in REPORTS.md.
+The analyzer does not establish semantic calibration or G5 readiness. `APP_MODE=real`
+remains blocked; enable providers explicitly within the demo.
 
-## Configuración
+## Configuration
 
-Dentro de WSL2, instalar el extra HTTP junto con los extras existentes del despliegue:
+Inside WSL2, install the HTTP extra alongside the deployment's existing extras:
 
 ```bash
 python -m pip install -e '.[test,media,llm]'
 ```
 
-Configurar `.env` sin imprimir valores:
+Configure `.env` without printing values:
 
 ```dotenv
 APP_MODE=mock
@@ -40,52 +38,48 @@ CONVERSATION_MAX_CALLS=30
 CONVERSATION_TIMEOUT_SECONDS=8
 ```
 
-No habilitar el flag hasta que la clave esté guardada. El inicio rechaza una clave faltante
-usando el nombre del campo sin imprimir su valor. El flag está desactivado por defecto.
-Importar, construir o iniciar la aplicación no invoca a Anthropic: la primera llamada
-analiza una respuesta de competencia con el consentimiento actual.
+Do not enable the flag until the key is saved. Startup rejects a missing key using the
+field name without printing its value. The flag is off by default. Importing, constructing
+or starting the application does not invoke Anthropic: the first call analyzes a competency
+answer with current consent.
 
-Crear una nueva invitación antes de usar el proveedor. El consentimiento indica que
-Anthropic recibe preguntas y fragmentos filtrados de respuestas para la competencia actual.
-Las sesiones aceptadas bajo el aviso anterior no pueden iniciar, reanudar ni enviar
-respuestas a Claude; sí pueden finalizar. Los avisos de Tavus/audio permanecen cuando
-esas modalidades están habilitadas.
+Create a new invitation before using the provider. Consent states that Anthropic receives
+questions and filtered answer excerpts for the current competency. Sessions accepted under
+the previous notice cannot start, resume or send answers to Claude; they can still end.
+Tavus/audio notices remain when those modalities are enabled.
 
-La página `/` distingue `conversation: anthropic|mock` y `scoring: anthropic|mock`.
-Un valor `anthropic` solo no establece conectividad ni calidad semántica: se requiere una
-prueba autorizada con credenciales válidas.
+The `/` page distinguishes `conversation: anthropic|mock` and `scoring: anthropic|mock`.
+An `anthropic` value alone does not establish connectivity or semantic quality: an
+authorized test with valid credentials is required.
 
-## Límites y fallos
+## Limits and failures
 
-- Una solicitud a `https://api.anthropic.com/v1/messages` por análisis; sin reintentos
-  automáticos.
-- Versión de API `2026-10-21`, salida JSON basada en schema y validación local estricta.
-- Como máximo 8000 caracteres / 24000 bytes entre sistema y datos, y 512 tokens de salida.
-- Límite global por defecto: 30 intentos, compartidos entre entrevistas y persistidos en
-  `DATA_DIR/conversation-budget.sqlite3`, reservados transaccionalmente antes de enviar.
-  Los fallos, timeouts y respuestas inválidas también consumen una reserva.
-- Reiniciar/reconectar no reinicia el contador. Aumentar explícitamente el límite para
-  extender la demo; el contador nunca se borra automáticamente.
-- Timeout por defecto de ocho segundos. Errores, truncamiento, rechazo del proveedor,
-  JSON inválido o cuota agotada disparan el fallback del motor con `analysis_fallback`.
-  Las preguntas fijas pueden continuar el guión; no se fabrican evaluaciones del modelo.
-- Los logs del adaptador nunca contienen claves, prompts, respuestas ni cuerpos de error.
+- One request to `https://api.anthropic.com/v1/messages` per analysis; no automatic retries.
+- API version `2026-10-21`, schema-based JSON output and strict local validation.
+- At most 8000 characters / 24000 bytes across system and data, and 512 output tokens.
+- Default global limit: 30 attempts, shared across interviews and persisted in
+  `DATA_DIR/conversation-budget.sqlite3`, transactionally reserved before sending.
+  Failures, timeouts and invalid responses also consume a reservation.
+- Restarting/reconnecting does not reset the counter. Explicitly increase the limit to
+  extend the demo; the counter is never automatically deleted.
+- Default eight-second timeout. Errors, truncation, provider refusal, invalid JSON or
+  exhausted quota trigger engine fallback with `analysis_fallback`. Fixed questions can
+  continue the script; no model evaluations are fabricated.
+- Adapter logs never contain keys, prompts, responses or error bodies.
 
-Verificado inicialmente con HTTP simulado: contexto de seguimiento, reconexión, consentimiento
-versionado, cuotas concurrentes/persistentes, timeouts, errores y puntuación simulada
-independiente. El 2026-11-04, una clave válida habilitó dos análisis reales de respuestas
-sintéticas: el analizador solicitó el resultado faltante y luego avanzó cuando fue
-proporcionado, sin fallback. Esto no reemplaza la evaluación semántica ni un piloto con
-candidatos.
+Initially verified with simulated HTTP: follow-up context, reconnect, versioned consent,
+concurrent/persistent quotas, timeouts, errors and independent mock scoring. On 2026-11-04,
+a valid key enabled two real analyses of synthetic answers: the analyzer requested the
+missing outcome and then advanced when it was supplied, without fallback. This does not
+replace semantic evaluation or a candidate pilot.
 
-Las solicitudes de nombre se manejan antes del análisis de respuestas profesionales. Un
-reconocimiento no repite la pregunta, avanza la fase ni consume un seguimiento. Un nombre
-faltante se solicita una vez; las preferencias explícitas se reconstruyen desde la
-transcripción después de la reanudación. Los turnos solo-nombre no se convierten en
-contexto de análisis ni evidencia de puntuación.
+Name requests are handled before professional-answer analysis. An acknowledgement does
+not repeat the question, advance the phase or consume a follow-up. A missing name is
+requested once; explicit preferences are reconstructed from the transcript after resume.
+Name-only turns do not become analysis context or scoring evidence.
 
-## Referencias oficiales verificadas
+## Verified official references
 
 - API: https://platform.claude.com/docs/en/api/messages/create
-- JSON estructurado: https://platform.claude.com/docs/en/build-with-claude/structured-outputs
-- Modelo configurado: https://platform.claude.com/docs/en/models/haiku-5-5/overview
+- Structured JSON: https://platform.claude.com/docs/en/build-with-claude/structured-outputs
+- Configured model: https://platform.claude.com/docs/en/models/haiku-5-5/overview

@@ -1,36 +1,36 @@
-# Demo de audio y avatar
+# Demo audio and avatar
 
-## Estado verificado
+## Verified state
 
-La sala abre un canal WebRTC autenticado por la cookie de sesión. Pipecat 1.15.0 recibe
-el audio del micrófono, Silero detecta los turnos y Whisper local detecta el idioma sin
-forzar el español. Piper originalmente usaba `en_US-lessac-high` para inglés y
-`es_AR-daniela-high` para español; la configuración actual de voz femenina se describe a
-continuación. Ambas modalidades comparten el motor de fases y la persistencia de texto.
-El informe inicial era simulado sin puntajes numéricos; la puntuación real opcional se
-describe en REPORTS.md. No se solicita la cámara del candidato para la entrevista. Esta
-demo no almacena archivos de audio ni video, tal como se indica en el consentimiento. La
-grabación audiovisual del piloto está pendiente; no se declara como implementada.
+The room opens a WebRTC channel authenticated by the session cookie. Pipecat 1.15.0
+receives microphone audio, Silero detects turns, and local Whisper detects language
+without forcing Spanish. Piper originally used `en_US-lessac-high` for English and
+`es_AR-daniela-high` for Spanish; the current female voice configuration is below.
+Both modalities share the phase engine and text persistence. The initial report was
+mock without numeric scores; optional real scoring is described in REPORTS.md.
+The candidate's camera is not requested for the interview. This demo stores no audio
+or video files, as stated in consent. Pilot audiovisual recording remains pending;
+it is not claimed as implemented.
 
-TavusVideoService es una etapa opcional entre la salida TTS y del transporte. Sin una clave
-API, Face, PAL Echo y habilitación explícita, no se instancia y no consume minutos. Se
-verificó una prueba real autorizada: Chrome recibió video Anna a 1280×720 y audio, Whisper
-transcribió una respuesta sintética y el motor avanzó a warmup. Después del cierre, la
-API de Tavus confirmó `ended`. No existe medición formal de latencia/sincronización. Los
-fallos de media cierran el canal y permiten la continuación por texto; el fallback automático
-de Tavus a audio aún no está verificado. No usar este estado para entrevistas reales con
-candidatos.
+TavusVideoService is an optional stage between TTS and transport output. Without an API
+key, Face, PAL Echo and explicit enablement, it is not instantiated and consumes no
+minutes. An authorized real test was verified: Chrome received Anna video at 1280x720
+and audio, Whisper transcribed a synthetic answer, and the engine advanced to warmup.
+After closure, the Tavus API confirmed `ended`. No formal latency/synchronization
+measurement exists. Media failures close the channel and allow text continuation;
+automatic Tavus-to-audio fallback is not yet verified. Do not use this state for real
+candidate interviews.
 
-## Configuración
+## Setup
 
-Ejecutar en WSL2 con Python 3.12, desde la raíz del proyecto:
+Run in WSL2 with Python 3.12, from the project root:
 
 ```bash
 python -m pip install -e '.[test,media]'
 python -m pytest
 ```
 
-Configurar `.env` sin imprimir valores. Ejemplo de demo local:
+Configure `.env` without printing values. Local demo example:
 
 ```dotenv
 APP_MODE=mock
@@ -45,120 +45,116 @@ WHISPER_DEVICE=cpu
 MEDIA_MAX_MINUTES=3
 PUBLIC_BASE_URL=https://192.168.2.6:8443
 LISTEN_PORT=8443
-TLS_CERT_FILE=/ruta/privada/server.crt
-TLS_KEY_FILE=/ruta/privada/server.key
+TLS_CERT_FILE=/private/path/server.crt
+TLS_KEY_FILE=/private/path/server.key
 TURN_URL=turn:192.168.2.6:3479?transport=tcp
 ```
 
-El inicio prepara los modelos locales; la primera ejecución descarga los pesos. Los errores
-de preparación deshabilitan media mientras mantienen el texto disponible. `/admin/health`
-reporta `media_ready` y aún requiere `X-Admin-Key`. Los SDKs no se importan en modo solo
-texto.
+Startup prepares local models; the first run downloads weights. Preparation errors
+disable media while keeping text available. `/admin/health` reports `media_ready` and
+still requires `X-Admin-Key`. SDKs are not imported in text-only mode.
 
-Esta configuración limita media a una conexión global y tres minutos por conexión. Tavus
-también recibe `properties.max_call_duration`, acotado por el tiempo restante de la
-entrevista, `MEDIA_MAX_MINUTES` y `TAVUS_MAX_MINUTES_PER_SESSION`. Desconectar media
-preserva el plazo original de la entrevista en lugar de reiniciar el máximo de 30 minutos.
-No existe una reserva acumulativa global de gasto de Tavus: mantenerlo deshabilitado hasta
-que el presupuesto de prueba sea acordado y monitoreado.
+This configuration limits media to one global connection and three minutes per connection.
+Tavus also receives `properties.max_call_duration`, bounded by remaining interview time,
+`MEDIA_MAX_MINUTES` and `TAVUS_MAX_MINUTES_PER_SESSION`. Disconnecting media preserves
+the original interview deadline rather than resetting the 30-minute maximum. There is
+no cumulative global Tavus spending reservation: keep it disabled until the test budget
+is agreed and monitored.
 
-## HTTPS y NAT de WSL
+## HTTPS and WSL NAT
 
-El lanzador escucha solo en loopback. El portproxy de Windows homelab reenvía
-`192.168.2.6:8443` a `127.0.0.1:8443` y `:3479` a `127.0.0.1:3479`. Firewall:
-TCP 8443/3479 solo desde `192.168.2.0/24`. El puerto HTTP 8000 ejecuta
-`python -m ai_interviewer.redirect`, redirigiendo los navegadores a HTTPS preservando
-las rutas de invitación sin registro de acceso.
+The launcher listens only on loopback. Windows homelab portproxy forwards
+`192.168.2.6:8443` to `127.0.0.1:8443` and `:3479` to `127.0.0.1:3479`. Firewall:
+TCP 8443/3479 from `192.168.2.0/24` only. HTTP port 8000 runs
+`python -m ai_interviewer.redirect`, redirecting browsers to HTTPS while preserving
+invitation paths without access logging.
 
-El certificado de desarrollo incluye IP y SANs de localhost. No se instaló ninguna
-autoridad raíz en los dispositivos: los navegadores pueden advertir hasta que el
-certificado sea explícitamente de confianza. Usar un hostname y certificado de confianza
-para un despliegue estable. Los certificados/claves permanecen bajo `data/tls/`, fuera de Git.
+The development certificate includes IP and localhost SANs. No root authority was
+installed on devices: browsers may warn until the certificate is explicitly trusted.
+Use a hostname and trusted certificate for stable deployment. Certificates/keys remain
+under `data/tls/`, outside Git.
 
-El sistema Coturn 4.5.2 sirve TURN sobre TCP 3479 con credenciales HMAC temporales emitidas
-solo a sesiones autenticadas. `TURN_SHARED_SECRET` coincide con el `static-auth-secret`
-de coturn y nunca se envía a los navegadores. Los navegadores usan `relay` para atravesar
-el NAT de WSL. Los puertos de relay UDP 49160–49200 permanecen dentro de WSL; no exponer
-ese rango a la LAN. La configuración inicial de la demo y el PID estaban bajo `data/`.
-Reiniciar WSL puede cambiar su IP de relay; actualizar `relay-ip` y reiniciar coturn si
-es necesario. Los procesos iniciales de la demo no se registraron como servicios de inicio
-del sistema.
+System Coturn 4.5.2 serves TURN over TCP 3479 with temporary HMAC credentials issued only
+to authenticated sessions. `TURN_SHARED_SECRET` matches coturn's `static-auth-secret`
+and is never sent to browsers. Browsers use `relay` to traverse WSL NAT. UDP relay ports
+49160–49200 stay inside WSL; do not expose that range to the LAN. The initial demo
+configuration and PID were under `data/`. Restarting WSL may change its relay IP;
+update `relay-ip` and restart coturn if needed. The initial demo processes were not
+registered as system startup services.
 
-Corrección operacional: el servicio del sistema coturn ahora usa la configuración TURN de
-la aplicación. Una configuración del sistema anterior no coincidente impedía la asignación
-de relay ICE autenticado aunque el puerto TCP fuera alcanzable. La recopilación de relay
-de Chrome se verificó después de corregir la configuración. El navegador permite hasta
-25 segundos para la preparación ICE.
+Operational correction: the system coturn service now uses the application's TURN
+configuration. An earlier mismatched system configuration prevented authenticated
+ICE relay allocation even though the TCP port was reachable. Chrome relay gathering
+was verified after correcting the configuration. The browser allows up to 25 seconds
+for ICE preparation.
 
-## Configurar y repetir una prueba de avatar
+## Configure and repeat an avatar test
 
-1. Establecer `TAVUS_API_KEY`, `TAVUS_FACE_ID` y `TAVUS_PAL_ID` en `.env`; no pegarlos
-   en chats. Crear el PAL con `pipeline_mode: "echo"`: Tavus solo renderiza el habla de
-   Piper y no controla el guión. No usar un PAL conversacional completo.
-   Crearlo usando `POST /v2/pals` con este cuerpo:
+1. Set `TAVUS_API_KEY`, `TAVUS_FACE_ID` and `TAVUS_PAL_ID` in `.env`; do not paste them
+   into chats. Create the PAL with `pipeline_mode: "echo"`: Tavus only renders Piper
+   speech and does not control the script. Do not use a full conversational PAL.
+   Create it using `POST /v2/pals` with this body:
 
    ```json
    {"pal_name": "AI Interviewer Echo", "pipeline_mode": "echo", "default_face_id": "rc9cff32ceba"}
    ```
 
-   `TAVUS_REPLICA_ID` se acepta como alias legacy cuando `TAVUS_FACE_ID` está vacío;
-   Face tiene precedencia cuando ambos están establecidos. El alias adapta la configuración
-   existente, no los recursos de la cuenta; no los convierte ni verifica automáticamente.
-2. Acordar minutos estimados y costo con el dueño antes de habilitar Tavus (G4).
-3. Establecer `AVATAR_MODE=tavus`, `TAVUS_ENABLED=true` y reiniciar el runtime.
-4. Crear una nueva invitación. El consentimiento `media-tavus-v1` explica que Tavus recibe
-   la voz sintética del entrevistador. El consentimiento de texto/audio local no autoriza
-   este nuevo receptor; las entrevistas existentes no se convierten silenciosamente.
-5. Conectar el micrófono y verificar habla, video, sincronización, interrupción y cierre
-   remoto. Registrar duración/uso reales. Finalizar o desconectar después de la prueba.
+   `TAVUS_REPLICA_ID` is accepted as a legacy alias when `TAVUS_FACE_ID` is empty;
+   Face takes precedence when both are set. The alias adapts existing configuration,
+   not account resources; it does not automatically convert or verify them.
+2. Agree estimated minutes and cost with the owner before enabling Tavus (G4).
+3. Set `AVATAR_MODE=tavus`, `TAVUS_ENABLED=true` and restart the runtime.
+4. Create a new invitation. `media-tavus-v1` consent explains that Tavus receives the
+   synthetic interviewer voice. Text/local-audio consent does not authorize this new
+   recipient; existing interviews are not silently converted.
+5. Connect the microphone and check speech, video, synchronization, interruption and
+   remote closure. Record actual duration/usage. End or disconnect after the test.
 
-Fuentes verificadas: código instalado y el ejemplo oficial de Pipecat v1.15.0:
+Verified sources: installed code and the official Pipecat v1.15.0 example:
 https://github.com/pipecat-ai/pipecat/blob/v1.15.0/examples/video-avatar/video-avatar-tavus-video-service.py
 
-## Compatibilidad Face/PAL
+## Face/PAL compatibility
 
-El SDK fijado aún usa `replica_id` y `persona_id` en su constructor y llamadas REST.
-`pipeline/tavus_compat.py` adapta solo su sesión HTTP sin modificar el SDK:
+The pinned SDK still uses `replica_id` and `persona_id` in its constructor and REST calls.
+`pipeline/tavus_compat.py` adapts only its HTTP session without modifying the SDK:
 
-- `POST /v2/conversations` envía `face_id`, `pal_id`, límite de duración y grabación
-  deshabilitada.
-- `GET /v2/personas/{id}` se convierte en `GET /v2/pals/{id}`; devolver `pal_name` al
-  SDK como `persona_name`, sin propagar prompts de PAL ni claves de herramientas.
-- `POST /v2/conversations/{id}/end` retiene el endpoint actual.
+- `POST /v2/conversations` sends `face_id`, `pal_id`, duration limit and recording disabled.
+- `GET /v2/personas/{id}` becomes `GET /v2/pals/{id}`; return `pal_name` to the SDK as
+  `persona_name`, without propagating PAL prompts or tool keys.
+- `POST /v2/conversations/{id}/end` retains the current endpoint.
 
-Pipecat aún maneja audio `conversation.echo`, interrupciones, video y limpieza.
-El adaptador permite solo esos endpoints y deshabilita las redirecciones HTTP. Las pruebas
-ejercitan clientes/constructores reales de Pipecat 1.15 contra un doble de sesión, sin
-red ni costo. Esto verifica compatibilidad de software, no la prueba de video en vivo G4.
+Pipecat still handles `conversation.echo` audio, interruptions, video and cleanup.
+The adapter permits only those endpoints and disables HTTP redirects. Tests exercise
+real Pipecat 1.15 clients/constructors against a session double, without network or cost.
+This verifies software compatibility, not the G4 live-video test.
 
-Contrato REST verificado: https://docs.tavus.io/openapi.yaml.
-Guía Echo: https://docs.tavus.io/sections/conversational-video-interface/echo-mode.
+Verified REST contract: https://docs.tavus.io/openapi.yaml.
+Echo guide: https://docs.tavus.io/sections/conversational-video-interface/echo-mode.
 
-## Actualización de idioma y continuidad (2026-11-04)
+## Language and continuity update (2026-11-04)
 
-Las interfaces de consentimiento, sala y revisión usan inglés. Las entrevistas audiovisuales
-comienzan en inglés y detectan localmente respuestas en inglés/español usando langdetect.
-Las respuestas cortas o ambiguas retienen el idioma anterior. "Spanish please" y
-"English please" cambian de idioma sin avanzar la fase. El idioma se reconstruye desde
-la transcripción al reanudar. Las preguntas usan traducciones fijas; la detección no
-cambia la rúbrica ni permite que un modelo controle las fases.
+Consent, room and review interfaces use English. Audiovisual interviews start in English
+and locally detect English/Spanish answers using langdetect. Short or ambiguous answers
+retain the previous language. "Spanish please" and "English please" change language
+without advancing the phase. Language is reconstructed from the transcript on resume.
+Questions use fixed translations; detection neither changes the rubric nor lets a model
+control phases.
 
-Las voces se descargan/cargan durante la preparación de media. El VAD espera 0.8 segundos
-de silencio; la detección de ruido sola no interrumpe el TTS. Solo una transcripción
-reconocida activa la interrupción. El navegador tolera hasta ocho segundos de desconexión
-transitoria. El habla de cierre se reproduce antes del apagado de media.
+Voices download/load during media preparation. VAD waits for 0.8 seconds of silence;
+noise detection alone does not interrupt TTS. Only a recognized transcription triggers
+interruption. The browser tolerates up to eight seconds of transient disconnection.
+Closing speech plays before media shutdown.
 
-El presupuesto de Tavus del entorno de prueba permanece en un minuto por conexión hasta
-que se extienda explícitamente, aplicado tanto por el proveedor como por el proceso local.
-Prueba local sin Tavus: 22 segundos de WebRTC, 1036 frames recibidos, 667 con audio, con
-una apertura en inglés. Esto no reemplaza una prueba de Tavus en la red del usuario. Los
-informes e historiales citados retienen su contenido original.
+The test environment's Tavus budget remains one minute per connection until explicitly
+extended, enforced by both provider and local process. Local test without Tavus:
+22 seconds of WebRTC, 1036 received frames, 667 containing audio, with an English opening.
+This does not replace a Tavus test on the user's network. Historical reports and citations
+retain their original content.
 
-## Voz de entrevistadora femenina
+## Female interviewer voice
 
-El inglés usa `PIPER_ENGLISH_VOICE=en_GB-jenny_dioco-medium`; el español retiene
-`PIPER_VOICE=es_AR-daniela-high`. Ambas son voces Piper locales. La selección de voz en
-inglés es configurable en lugar de estar hardcodeada. La sala acredita a Jenny (Dioco),
-según lo requiere la licencia del dataset: https://github.com/dioco-group/jenny-tts-dataset .
-Los cambios de voz se aplican a las nuevas conexiones de media. El proveedor de avatar
-no cambia.
+English uses `PIPER_ENGLISH_VOICE=en_GB-jenny_dioco-medium`; Spanish retains
+`PIPER_VOICE=es_AR-daniela-high`. Both are local Piper voices. English voice selection
+is configurable rather than hardcoded. The room credits Jenny (Dioco), as required by
+the dataset license: https://github.com/dioco-group/jenny-tts-dataset .
+Voice changes apply to new media connections. The avatar provider is unchanged.

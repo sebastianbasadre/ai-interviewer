@@ -1,191 +1,179 @@
-# Arquitectura — línea base aprobada en G1
+# Architecture — G1-approved baseline
 
-Estado: línea base aprobada por el dueño en G1; las decisiones de alcance pendientes se
-listan a continuación.
-Piloto de selección PM/PO; una persona siempre revisa la recomendación. Sin decisiones
-automáticas de contratación.
+Status: baseline approved by the owner at G1; outstanding scope decisions are listed below.
+PM/PO screening pilot; a person always reviews the recommendation. No automated hiring decisions.
 
-## Entorno y límites
+## Environment and boundaries
 
-El dueño dirige la ejecución actualmente por SSH en el homelab `192.168.2.6`. El kit
-especifica WSL2; el homelab remoto confirmado provee ese entorno: Windows 11, WSL2
-NVIDIA-Workbench y una RTX 3090 de 24 GB. El orquestador preparó Python 3.12.16 en WSL2
-remoto. El stack no ha cambiado. La ejecución de Whisper con CUDA, los permisos de
-almacenamiento, HTTPS y la conectividad WebRTC aún no estaban verificados en este punto
-de la arquitectura.
+The owner currently directs execution over SSH on homelab `192.168.2.6`. The kit specifies
+WSL2; the confirmed remote homelab provides that environment: Windows 11, WSL2
+NVIDIA-Workbench and a 24 GB RTX 3090. The orchestrator prepared Python 3.12.16 in remote
+WSL2. The stack is unchanged. Whisper CUDA execution, storage permissions, HTTPS and
+WebRTC connectivity were still unverified at this architecture checkpoint.
 
-Una instancia de FastAPI sirve páginas y señalización; una sesión posee un motor y un
-pipeline. SQLite almacena entrevistas, consentimientos, turnos e informes. Los archivos
-viven en `DATA_DIR/<UUID>/`. Permitir una sesión activa por entrevista; ajustar un límite
-global de sesiones según la capacidad GPU medida antes del piloto. Sin multitenencia ni
-colas distribuidas.
+One FastAPI instance serves pages and signaling; a session owns an engine and pipeline.
+SQLite stores interviews, consent, turns and reports. Files live under `DATA_DIR/<UUID>/`.
+Allow one active session per interview; tune a global session limit against measured GPU
+capacity before the pilot. No multitenancy or distributed queues.
 
-## Flujo en vivo
+## Live flow
 
 ```mermaid
 flowchart LR
-    B[Navegador: consentimiento y sala] --> W[SmallWebRTCTransport]
-    W --> V[Silero VAD y analizador de turnos]
-    V --> S[Whisper local / OpenAI STT]
-    S --> E[Motor determinista]
-    E --> L[Claude: redacción de turno acotada]
+    B[Browser: consent and room] --> W[SmallWebRTCTransport]
+    W --> V[Silero VAD and turn analyzer]
+    V --> S[Local Whisper / OpenAI STT]
+    S --> E[Deterministic engine]
+    E --> L[Claude: bounded turn wording]
     L --> E
     E --> T[OpenAI TTS / Piper]
-    T --> A[Avatar simulado / Tavus]
+    T --> A[Mock avatar / Tavus]
     A --> W
     W --> B
-    E --> R[SessionStore: turnos]
-    W --> C[Audio separado por hablante]
+    E --> R[SessionStore: turns]
+    W --> C[Separate audio per speaker]
     C --> R
 ```
 
-El motor controla las fases, seis competencias, como máximo dos seguimientos y el tiempo;
-el LLM no controla las transiciones:
+The engine controls phases, six competencies, at most two follow-ups and timing; the LLM
+does not control transitions:
 `consent_check → intro → warmup → competencies → candidate_questions → closing → done`.
-Declarar explícitamente la divulgación de IA y grabación al inicio. No capturar medios ni
-llamar proveedores hasta que el almacenamiento confirme el consentimiento versionado y el
-consumo atómico de tokens. La sala solicita permisos de dispositivo después del
-consentimiento. El bot tiene un límite duro de 30 minutos, configurable a la baja.
+Explicitly speak the AI and recording disclosure at the start. Do not capture media or
+call providers until storage confirms versioned consent and atomic token consumption.
+The room requests device permissions after consent. The bot has a hard 30-minute limit,
+configurable downward.
 
-## Después de la entrevista
+## After the interview
 
 ```mermaid
 flowchart LR
-    T[Transcripción persistida] --> F[Excluir datos sensibles del contexto de puntuación]
-    R[Rúbrica versionada] --> S[Puntuación: tres ejecuciones]
+    T[Persisted transcript] --> F[Exclude sensitive data from scoring context]
+    R[Versioned rubric] --> S[Scoring: three runs]
     F --> S
-    S --> V[Validar JSON, evidencia y competencias]
-    V --> M[Mediana y dispersión]
-    M --> H[Informe JSON + Markdown/HTML]
-    H --> P[Revisión humana]
+    S --> V[Validate JSON, evidence and competencies]
+    V --> M[Median and spread]
+    M --> H[JSON + Markdown/HTML report]
+    H --> P[Human review]
 ```
 
-Un puntaje numérico requiere referencias existentes de turnos del candidato en esta
-entrevista que sean relevantes para la competencia. El validador de puntuación verifica
-esas relaciones antes de guardar. Los contratos validan la estructura e invariantes locales;
-no pueden establecer independientemente la relevancia semántica. La evidencia faltante
-produce `score=null, insufficient_evidence=true`. Una dispersión >1 agrega una alerta.
-Nunca puntuar audio, imagen, acento, apariencia ni información demográfica.
+A numeric score requires existing candidate turn references from this interview that
+are relevant to the competency. The scoring validator checks those relationships before
+saving. Contracts validate structure and local invariants; they cannot independently
+establish semantic relevance. Missing evidence produces
+`score=null, insufficient_evidence=true`. Spread >1 adds an alert. Never score audio,
+image, accent, appearance or demographic information.
 
-## Contratos y propiedad
+## Contracts and ownership
 
-`src/ai_interviewer/contracts.py` es el límite compartido, sin SDKs externos. Los modelos
-Pydantic rechazan campos extra. Los IDs son UUIDs. Los tiempos de turno son segundos desde
-un origen monótono compartido; las fechas persistidas requieren información de zona horaria.
+`src/ai_interviewer/contracts.py` is the shared boundary, with no external SDKs. Pydantic
+models reject extra fields. IDs are UUIDs. Turn times are seconds from a shared monotonic
+origin; persisted dates require timezone information.
 
-| Dueño | Responsabilidad | Límite |
+| Owner | Responsibility | Boundary |
 |---|---|---|
-| architect | Contratos, configuración, ADRs | Modelos y Protocolos |
-| interview-engine | Fases, preguntas, puntuación | InterviewEngine, EngineDecision, InterviewReport |
-| pipeline-engineer | WebRTC, servicios, simulado/Tavus | InterviewEngine, AvatarService, RecordingChunk |
-| web-api | Autenticación, consentimiento, almacenamiento | SessionStore, Interview, ConsentRecord |
-| qa-evals | Escenarios y métricas | Mismas interfaces con dobles offline |
+| architect | Contracts, configuration, ADRs | Models and Protocols |
+| interview-engine | Phases, questions, scoring | InterviewEngine, EngineDecision, InterviewReport |
+| pipeline-engineer | WebRTC, services, mock/Tavus | InterviewEngine, AvatarService, RecordingChunk |
+| web-api | Authentication, consent, storage | SessionStore, Interview, ConsentRecord |
+| qa-evals | Scenarios and metrics | Same interfaces with offline doubles |
 
-Los métodos del motor y almacenamiento son async; `transcript()` devuelve una copia
-instantánea. El pipeline envía `EngineEvent` para silencio, límite duro o terminación
-voluntaria. El límite duro y la terminación finalizan la sesión sin otra llamada al LLM.
-`restore()` reconstruye el motor desde el estado/turnos persistidos sin hablar; la API
-primero valida la credencial y el plazo original.
+Engine and storage methods are async; `transcript()` returns a snapshot copy. The pipeline
+sends `EngineEvent` for silence, hard limit or voluntary termination. The hard limit and
+termination end the session without another LLM call. `restore()` rebuilds the engine
+from persisted state/turns without speaking; the API first validates the credential and
+original deadline.
 
-El inicio del habla invalida respuestas pendientes mediante una época. Si una respuesta
-no ha sido entregada, el coordinador guarda el turno real del candidato y descarta el
-motor, que puede haber avanzado internamente. `InterviewEngineFactory` crea uno nuevo;
-`restore()` recibe la última fase entregada, competencia y conteo de seguimientos, el plazo
-original, y la transcripción comprometida más el turno real. Solo el tiempo transcurrido
-avanza. Una pregunta generada pero no entregada nunca entra al almacenamiento ni al motor
-restaurado. Las interrupciones normales no abortan la sesión; la reconstrucción nunca
-llama a proveedores. La persistencia y la reanudación deben usar el mismo punto de control;
-el fallo de almacenamiento detiene la sesión.
+Speech onset invalidates pending responses through an epoch. If a response has not been
+delivered, the coordinator saves the actual candidate turn and discards the engine,
+which may already have advanced internally. `InterviewEngineFactory` creates a new one;
+`restore()` receives the last delivered phase, competency and follow-up count, original
+deadline, and committed transcript plus the actual turn. Only elapsed time advances.
+A generated but undelivered question never enters storage or the restored engine. Normal
+interruptions do not abort the session; reconstruction never calls providers. Persistence
+and resume must use the same checkpoint; storage failure stops the session.
 
-Si el habla comienza mientras se persiste una respuesta pendiente, `replace_progress()`
-restaura el snapshot y la transcripción transaccionalmente: preservar todos los turnos
-reales del candidato y eliminar únicamente las respuestas del entrevistador no entregadas.
-Requerir consentimiento activo, propiedad y un plazo idéntico; no tocar audio ni informes.
-La entrega lógica ocurre cuando `output.text` acepta un mensaje en la cola, no cuando el
-navegador confirma la reproducción. Antes de este límite, el rollback es posible; después,
-preservar el turno visible/en cola, y el barge-in corta únicamente el audio pendiente.
+If speech begins while a pending response is being persisted, `replace_progress()`
+restores snapshot and transcript transactionally: preserve every actual candidate turn
+and remove only undelivered interviewer responses. Require active consent, ownership and
+an identical deadline; do not touch audio or reports. Logical delivery occurs when
+`output.text` accepts a message into the queue, not when the browser acknowledges playback.
+Before this boundary, rollback is possible; afterward preserve the visible/queued turn,
+and barge-in cuts only pending audio.
 
-La API autoriza sesiones y crea un motor por entrevista. `SessionStore` aplica el
-consentimiento en escrituras de audio/turno y reclamaciones atómicas. Un token de
-invitación aleatorio de 32 bytes expira en siete días; persistir solo su hash SHA-256.
-Reclamarlo lo consume, y la API emite una credencial de sesión independiente y de corta
-duración vinculada al UUID. La reanudación usa esa credencial, nunca reactiva la
-invitación, y permanece limitada por el plazo original. Probar la señalización y la
-autenticación de reanudación en la Fase 2. Nunca registrar tokens ni credenciales en
-los logs de acceso.
+The API authorizes sessions and creates one engine per interview. `SessionStore` enforces
+consent on audio/turn writes and atomic claims. A random 32-byte invitation token expires
+in seven days; persist only its SHA-256 hash. Claiming consumes it, and the API issues an
+independent, short-lived session credential bound to the UUID. Resume uses that credential,
+never reactivates the invitation, and remains limited by the original deadline. Test
+signaling and resume authentication in Phase 2. Never log tokens or credentials in access logs.
 
-## Latencia y fallos
+## Latency and failures
 
-Presupuesto p50 objetivo desde el fin del habla hasta el primer audio del avatar,
-**aún no medido**:
+Target p50 budget from end of speech to first avatar audio, **not yet measured**:
 
-| Etapa | Presupuesto |
+| Stage | Budget |
 |---|---:|
-| Detección de fin de turno | 200 ms |
-| STT final | 200 ms |
-| Motor + primer texto del LLM | 300 ms |
-| Primer audio TTS | 250 ms |
-| Avatar + transporte | 200 ms |
+| End-of-turn detection | 200 ms |
+| Final STT | 200 ms |
+| Engine + first LLM text | 300 ms |
+| First TTS audio | 250 ms |
+| Avatar + transport | 200 ms |
 | Total | 1150 ms |
 
-Registrar p50/p95 por etapa y total con un reloj monótono, solo IDs técnicos, sin contenido.
-Estos números son hipótesis para sondeo real, no garantías. Si el avatar requiere buffers
-más grandes, reportar el objetivo incumplido y evaluar la operación solo con audio; no
-cambiar el umbral sin revisión.
+Record per-stage and total p50/p95 with a monotonic clock, technical IDs only, no content.
+These numbers are hypotheses for real probing, not guarantees. If the avatar requires
+larger buffers, report the missed target and assess audio-only operation; do not change
+the threshold without review.
 
-| Fallo | Comportamiento previsto |
+| Failure | Intended behavior |
 |---|---|
-| Fallo del STT local | OpenAI STT si está configurado con credenciales; de lo contrario pausar y notificar |
-| LLM lento/fallido | Timeout acotado; una repetición y una pregunta base segura para la fase actual |
-| Fallo del TTS | Piper si está instalado; de lo contrario texto visible y una bandera de sesión degradada |
-| Fallo de Tavus | Detener el avatar y continuar con audio, con notificación y bandera |
-| Interrupción del candidato | Cancelar generación/audio y limpiar buffers del avatar |
-| 20 segundos de silencio | Evento de repetición/reformulación del motor, dentro del límite de tiempo global |
-| Desconexión | Persistir estado; reanudar con credenciales de sesión y el plazo original |
-| Fallo de almacenamiento | Detener la captura y la sesión; no acumular datos no persistidos |
+| Local STT failure | OpenAI STT if configured with credentials; otherwise pause and notify |
+| Slow/failed LLM | Bounded timeout; one repeat and a safe base question for the current phase |
+| TTS failure | Piper if installed; otherwise visible text and a degraded-session flag |
+| Tavus failure | Stop the avatar and continue audio, with notification and flag |
+| Candidate interruption | Cancel generation/audio and clear avatar buffers |
+| 20 seconds of silence | Engine repeat/rephrase event, within the global time limit |
+| Disconnect | Persist state; resume using session credentials and the original deadline |
+| Storage failure | Stop capture and session; do not accumulate unpersisted data |
 
-Los reintentos/fallbacks deben estar acotados y no pueden duplicar audio, turnos ni gasto
-de tokens. Antes de la implementación, verificar las clases/parámetros del pipeline contra
-Pipecat 1.15.0 instalado y los ejemplos oficiales etiquetados. Esta fase de arquitectura
-no importa ni asume APIs de Pipecat.
+Retries/fallbacks must be bounded and cannot duplicate audio, turns or token spending.
+Before implementation, verify pipeline classes/parameters against installed Pipecat 1.15.0
+and official tagged examples. This architecture phase neither imports nor assumes Pipecat APIs.
 
-## Privacidad, seguridad y alcance
+## Privacy, security and scope
 
-`/admin/*` requiere una clave API en cabecera y comparación en tiempo constante. Nunca
-serializar claves para diagnósticos. TLS es obligatorio fuera de localhost; restringir
-CORS al origen configurado. El consentimiento explícito, un indicador de grabación y un
-botón de Finalizar son requisitos de la sala. Almacenar direcciones IP con HMAC-SHA256 y
-un secreto separado. Nunca registrar URLs de tokens ni transcripciones. Grabar el audio
-del candidato y el bot por separado. La grabación de video y el formato esperan la revisión
-de alcance G1 antes de la implementación. Tavus transmite video y debe identificarse como
-receptor de datos en el consentimiento cuando está habilitado.
+`/admin/*` requires a header API key and constant-time comparison. Never serialize keys
+for diagnostics. TLS is mandatory outside localhost; restrict CORS to the configured
+origin. Explicit consent, a recording indicator and an End button are room requirements.
+Store IP addresses with HMAC-SHA256 and a separate secret. Never log token URLs or transcripts.
+Record candidate/bot audio separately. Video recording and format await G1 scope review
+before implementation. Tavus transmits video and must be identified as a data recipient
+in consent when enabled.
 
-Retención propuesta: 30 días desde el cierre, o la creación si nunca se inició. Luego
-eliminar datos personales, turnos, informes y archivos. Solo sobreviven agregados sin IDs
-ni texto libre. La eliminación solicitada cubre el conjunto de datos completo. Los respaldos
-necesitan procedimientos de expiración y restauración compatibles que no puedan resucitar
-registros eliminados. Ver ADR-003.
+Proposed retention: 30 days from closure, or creation if never started. Then delete
+personal data, turns, reports and files. Only aggregates without IDs or free text survive.
+Requested deletion covers the entire dataset. Backups need compatible expiry and restore
+procedures that cannot resurrect deleted records. See ADR-003.
 
-Antes de producción: revisión legal, HTTPS/TURN medido, autenticación robusta, límites de
-proveedores y concurrencia, respaldo/restauración probado, retención efectiva y calibración
-humana.
-Antes del piloto: rúbrica G2, evaluaciones pagadas G3, Tavus G4, go/no-go G5.
+Before production: legal review, measured HTTPS/TURN, robust authentication, provider and
+concurrency limits, tested backup/restore, effective retention, and human calibration.
+Before the pilot: G2 rubric, G3 paid evaluations, G4 Tavus, G5 go/no-go.
 
-## Dependencias verificadas
+## Verified dependencies
 
-Pins directos verificados contra las APIs oficiales de PyPI el 2026-11-02:
+Direct pins checked against official PyPI APIs on 2026-11-02:
 [Pipecat 1.15.0](https://pypi.org/pypi/pipecat-ai/1.15.0/json),
 [Pydantic](https://pypi.org/pypi/pydantic/json),
 [pydantic-settings](https://pypi.org/pypi/pydantic-settings/json),
 [FastAPI](https://pypi.org/pypi/fastapi/json), [pytest](https://pypi.org/pypi/pytest/json).
-Pipecat está en el extra `realtime`; el CI de contratos instala `.[test]` sin servicios ni
-GPU. `make install` también instala Pipecat. El dueño del pipeline añadirá extras de
-proveedor/CUDA después de inspeccionar el wheel y resolverlos en el homelab. Los pins
-directos no son un lock transitivo; generar un lock resuelto después de validar ese entorno.
+Pipecat is in the `realtime` extra; contract CI installs `.[test]` without services or GPU.
+`make install` also installs Pipecat. The pipeline owner will add provider/CUDA extras
+after inspecting the wheel and resolving them in the homelab. Direct pins are not a
+transitive lock; generate a resolved lock after validating that environment.
 
-## Decisiones G1
+## G1 decisions
 
-1. Aprobar la arquitectura y los contratos async para el desarrollo paralelo de módulos.
-2. Medir Whisper/CUDA en el homelab confirmado; la visibilidad de la GPU ya está verificada.
-3. Confirmar el alcance de grabación: audio separado, y si también se requiere video persistido.
-4. Confirmar la retención propuesta de 30 días y el dueño/contacto de privacidad antes del piloto.
+1. Approve architecture and async contracts for parallel module development.
+2. Measure Whisper/CUDA on the confirmed homelab; GPU visibility is already verified.
+3. Confirm recording scope: separate audio, and whether persisted video is also required.
+4. Confirm the proposed 30-day retention and privacy owner/contact before the pilot.

@@ -1,25 +1,22 @@
-# ADR-001: stack del piloto
+# ADR-001: pilot stack
 
-Estado: aceptado por el dueño del proyecto en G1. Fecha: 2026-11-02.
+Status: accepted by the project owner at G1. Date: 2026-11-02.
 
-## Contexto
+## Context
 
-El proyecto necesita conversación de baja latencia con interrupciones y un piloto simple,
-según se especifica en CLAUDE.md.
+The project needs low-latency conversation with interruptions and a simple pilot, as specified in CLAUDE.md.
 
-## Decisión
+## Decision
 
-Mantener Python 3.12, Pipecat 1.15.0, SmallWebRTCTransport, Silero y el analizador de
-turnos, Whisper NVIDIA local (fallback OpenAI), Claude para conversación/puntuación,
-OpenAI TTS (fallback Piper), Tavus y un avatar simulado por defecto. Usar FastAPI, SQLite
-y archivos locales. No poner Ollama en la ruta crítica. El dueño confirmó acceso SSH al
-homelab: Windows 11 con WSL2 NVIDIA-Workbench y RTX 3090. Este es el entorno WSL2
-planificado, ejecutado de forma remota. La ejecución real de Whisper en CUDA aún no está
-verificada.
+Keep Python 3.12, Pipecat 1.15.0, SmallWebRTCTransport, Silero and the turn analyzer,
+local NVIDIA Whisper (OpenAI fallback), Claude for conversation/scoring, OpenAI TTS
+(Piper fallback), Tavus, and a mock avatar by default. Use FastAPI, SQLite and local files.
+Do not put Ollama on the critical path. The owner confirmed SSH access to the homelab:
+Windows 11 with WSL2 NVIDIA-Workbench and RTX 3090. This is the planned WSL2 environment,
+run remotely. Real Whisper execution on CUDA remains unverified.
 
-## Consecuencias
+## Consequences
 
-Separar las dependencias de contrato/pruebas de las dependencias de runtime para que las
-simulaciones funcionen sin GPU. Verificar las APIs de Pipecat contra el código instalado y
-los ejemplos oficiales antes de usarlas. En esta etapa no se habilitan cambios implícitos
-de stack ni servicios pagados.
+Separate contract/test dependencies from runtime dependencies so mocks work without a GPU.
+Verify Pipecat APIs against installed code and official examples before use.
+No implicit stack changes or paid services are enabled at this stage.

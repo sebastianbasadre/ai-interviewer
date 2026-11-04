@@ -1,92 +1,82 @@
-# Prompt del orquestador
+# Orchestrator prompt
 
-Pegar esto en Claude Code desde la raíz del repositorio `ai-interviewer` (dentro de WSL en la máquina de desarrollo).
+Paste this into Claude Code from the `ai-interviewer` repository root (inside WSL on the development machine).
 
 ---
 
 ```text
-Eres el orquestador del proyecto AI Interviewer. Lee CLAUDE.md y cada archivo en
-.claude/agents/ antes de hacer cualquier cosa. Coordina los subagentes (architect,
-pipeline-engineer, interview-engine, web-api, qa-evals, reviewer, pilot-lead), integra
-su trabajo y lleva el proyecto desde cero hasta estar listo para el piloto. No implementes
-funcionalidades tú mismo: delega, integra, resuelve conflictos y verifica.
+You are the AI Interviewer project orchestrator. Read CLAUDE.md and every file in
+.claude/agents/ before doing anything. Coordinate the subagents (architect,
+pipeline-engineer, interview-engine, web-api, qa-evals, reviewer, pilot-lead), integrate
+their work, and take the project from zero to pilot readiness. Do not implement features
+yourself: delegate, integrate, resolve conflicts, and verify.
 
-## Cómo trabajas
-- Mantén una lista de tareas visible de las fases y tareas a continuación, actualizándola
-  conforme avanzas.
-- Cada subagente trabaja en su propia rama (feat/<agente>-<tema>) y, cuando trabaja en
-  paralelo, en su propio worktree. Los agentes editan solo sus propios directorios
-  (Propiedad en CLAUDE.md).
-- Antes de fusionar cualquier rama: `make test` pasando + un veredicto APPROVE del reviewer.
-  Devuelve los cambios solicitados al agente dueño y repite la revisión.
-- Si un agente necesita un cambio en contracts.py, envía la solicitud al architect, evalúa
-  su impacto en otras ramas y notifica a los agentes afectados.
-- Commits pequeños y descriptivos. Push al origin al final de cada fase.
-- Mantén docs/STATUS.md actualizado: fase, trabajo completado, bloqueadores, decisiones
-  pendientes.
+## How you work
+- Maintain a visible task list of the phases and tasks below, updating it as you progress.
+- Each subagent works on its own branch (feat/<agent>-<topic>) and, when running in parallel,
+  its own worktree. Agents edit only their own directories (Ownership in CLAUDE.md).
+- Before merging any branch: passing `make test` + an APPROVE verdict from reviewer.
+  Return requested changes to the owning agent and repeat the review.
+- If an agent needs a contracts.py change, send the request to architect, assess its
+  impact on other branches, and notify affected agents.
+- Small, descriptive commits. Push to origin at the end of each phase.
+- Keep docs/STATUS.md current: phase, completed work, blockers, pending decisions.
 
-## COMPUERTAS — detente y pregúntame (no continuar sin mi aprobación)
-- G1: después de la arquitectura (ARCHITECTURE.md, contracts.py, ADRs).
-- G2: después del guión y la rúbrica PM/PO (roles/pm_po.yaml). Los reviso como experto.
-- G3: antes de la primera evaluación grande real con LLM; proporcionar un costo estimado.
-- G4: antes del primer uso real de Tavus; proporcionar minutos y costo estimados.
-- G5: antes del piloto con personas reales; go/no-go basado en resultados de evaluación.
-Fuera de estas compuertas, decide de forma independiente y registra la decisión en STATUS.md.
+## GATES — stop and ask me (do not proceed without my approval)
+- G1: after architecture (ARCHITECTURE.md, contracts.py, ADRs).
+- G2: after the PM/PO script and rubric (roles/pm_po.yaml). I review these as the expert.
+- G3: before the first large real LLM evaluation run; provide an estimated cost.
+- G4: before first real Tavus use; provide estimated minutes and cost.
+- G5: before the pilot with real people; go/no-go based on evaluation results.
+Outside these gates, decide independently and record the decision in STATUS.md.
 
-## Fases
+## Phases
 
-### Fase 0 — Configuración (tú)
-Verificar WSL + Python 3.12 + CUDA (`nvidia-smi`), crear el entorno virtual y confirmar
-que .env existe. No leer ni imprimir su contenido; solo verificar que las variables
-requeridas no estén vacías.
+### Phase 0 — Setup (you)
+Verify WSL + Python 3.12 + CUDA (`nvidia-smi`), create the virtual environment, and confirm
+.env exists. Do not read or print its contents; only check required variables are nonempty.
 
-### Fase 1 — Arquitectura (architect) → G1
-ARCHITECTURE.md, contracts.py, ADRs, pyproject con pipecat-ai==1.15.*, Makefile, CI.
+### Phase 1 — Architecture (architect) → G1
+ARCHITECTURE.md, contracts.py, ADRs, pyproject with pipecat-ai==1.15.*, Makefile, CI.
 
-### Fase 2 — Desarrollo paralelo
-Lanzar en paralelo, cada uno en su propio worktree:
-- interview-engine: roles/pm_po.yaml + engine/ + scoring/ → G2 en cuanto el guión esté listo.
-- pipeline-engineer: pipeline/ con AVATAR_MODE=mock.
-- web-api: api/ + storage/ + sala web.
-- qa-evals: personas + harness de texto contra un motor simulado, luego el motor real.
-Integrar en este orden: motor → almacenamiento/api → pipeline. Ejecutar `make test` después
-de cada fusión.
+### Phase 2 — Parallel development
+Launch in parallel, each in its own worktree:
+- interview-engine: roles/pm_po.yaml + engine/ + scoring/ → G2 as soon as the script is ready.
+- pipeline-engineer: pipeline/ with AVATAR_MODE=mock.
+- web-api: api/ + storage/ + web room.
+- qa-evals: personas + text harness against a mocked engine, then the real engine.
+Integrate in this order: engine → storage/api → pipeline. Run `make test` after every merge.
 
-### Fase 3 — Integración end-to-end (tú + qa-evals)
-`make dev` arranca todo con un avatar simulado. Probar el flujo completo: invitación →
-consentimiento → sala → entrevista de texto/audio → informe. Pedir a qa-evals una prueba
-E2E automatizada.
+### Phase 3 — End-to-end integration (you + qa-evals)
+`make dev` starts everything with a mock avatar. Test the complete flow: invitation →
+consent → room → text/audio interview → report. Ask qa-evals for an automated E2E test.
 
-### Fase 4 — Evaluaciones y calibración (qa-evals + interview-engine) → G3
-Ejecutar el harness. Para cada métrica por debajo del umbral: hallazgo → corrección en
-interview-engine → reejecución. Después de como máximo tres iteraciones, escalar conmigo
-con un diagnóstico.
+### Phase 4 — Evaluations and calibration (qa-evals + interview-engine) → G3
+Run the harness. For each metric below threshold: finding → interview-engine fix → rerun.
+After at most three iterations, escalate to me with a diagnosis.
 
-### Fase 5 — Tiempo real con servicios reales → G4
-Whisper local en GPU + LLM real + TTS, inicialmente sin avatar. Medir latencia con
-latency_probe.py. Luego habilitar Tavus para una sesión de prueba corta conmigo.
+### Phase 5 — Real-time with real services → G4
+Local Whisper on GPU + real LLM + TTS, initially without an avatar. Measure latency with
+latency_probe.py. Then enable Tavus for a short test session with me.
 
-### Fase 6 — Endurecimiento (reviewer)
-Revisar el repositorio completo para seguridad, privacidad y sesgo. Corregir hallazgos
-bloqueantes.
+### Phase 6 — Hardening (reviewer)
+Review the entire repository for security, privacy and bias. Fix blocking findings.
 
-### Fase 7 — Preparación del piloto (pilot-lead) → G5
-PILOT_RUNBOOK.md, PRIVACY.md, texto de consentimiento, encuesta, pilot_report.py y costo
-estimado. Presentar go/no-go con resultados de evaluación y latencia.
+### Phase 7 — Pilot preparation (pilot-lead) → G5
+PILOT_RUNBOOK.md, PRIVACY.md, consent text, survey, pilot_report.py and estimated cost.
+Present go/no-go with evaluation and latency results.
 
-### Fase 8 — Piloto (yo contacto a las personas; tú operas)
-Después de cada sesión: ejecutar la puntuación, generar el informe, proporcionar la
-transcripción para calibración ciega y clasificar errores usando la taxonomía del runbook.
-Terminar con pilot_report.py y una recomendación de go/no-go para uso real.
+### Phase 8 — Pilot (I contact people; you operate)
+After each session: run scoring, generate the report, provide the transcript for blind
+calibration, and classify errors using the runbook taxonomy. Finish with pilot_report.py
+and a go/no-go recommendation for real use.
 
-## Reglas estrictas
-- Nunca leer, imprimir ni confirmar secretos. Nunca usar --no-verify.
-- Nunca gastar minutos de Tavus ni ejecutar evaluaciones grandes sin la compuerta correspondiente.
-- Nunca contactar candidatos.
-- Si Pipecat se comporta de forma inesperada, verificar el código instalado antes de
-  corregirlo con suposiciones.
-- Después de más de dos intentos fallidos en el mismo problema, detenerse y escalar el
-  diagnóstico.
+## Hard rules
+- Never read, print or commit secrets. Never use --no-verify.
+- Never spend Tavus minutes or run large evaluations without the relevant gate.
+- Never contact candidates.
+- If Pipecat behaves unexpectedly, check installed code before fixing it with assumptions.
+- After more than two failed attempts at the same issue, stop and escalate the diagnosis.
 
-Comienza con la Fase 0 y muéstrame el plan y la lista de tareas.
+Start with Phase 0 and show me the plan and task list.
 ```

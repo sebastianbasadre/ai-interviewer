@@ -1,12 +1,12 @@
-# Evaluaciones sintéticas y pruebas de integración
+# Synthetic evaluations and integration tests
 
-Estado: herramientas offline implementadas; **G3 pendiente**. No se ha ejecutado ningún
-lote real de evaluación de modelos. Los perfiles son fixtures sintéticos; los niveles
-esperados son hipótesis de calibración para revisión humana, no verdad objetiva.
+Status: offline tooling implemented; **G3 pending**. No real-model evaluation batch has
+been run. Profiles are synthetic fixtures; expected levels are calibration hypotheses
+for human review, not objective truth.
 
-## Uso offline sin costos
+## Offline usage without costs
 
-Desde la raíz del repositorio, con Python 3.12 y dependencias de prueba:
+From the repository root, with Python 3.12 and test dependencies:
 
 ```bash
 python -m evals.run_evals
@@ -14,117 +14,112 @@ python -m evals.run_evals --runs 3 --output evals/results
 python -m pytest tests/integration
 ```
 
-El uso por defecto utiliza `StructuredInterviewEngine` sin un LLM, respuestas con guión y
-`MockScoringModel`. Ejercita el código real de fases, seguimientos, banderas y puntuación,
-pero el analizador offline solicita aclaraciones conservadoras y la puntuación devuelve
-solo puntajes null con `mock_scoring`. **Esto no mide calidad de conversación, ranking
-ni precisión.** Cada compuerta de calidad es `not_evaluated`; los simulados pasando nunca
-autorizan un piloto. El JSON separa observaciones estructurales de métricas: cobertura de
-flujo, límites, terminación, seguimientos para fixtures sin ejemplos y canarios sintéticos
-de datos sensibles. Los informes Markdown listan fallos por persona/turno; el JSON retiene
-transcripciones sintéticas para investigación de evidencias.
+The default uses `StructuredInterviewEngine` without an LLM, scripted answers and
+`MockScoringModel`. It exercises real phase, follow-up, flag and scoring code, but the
+offline analyzer requests conservative clarifications and scoring returns only null
+scores with `mock_scoring`. **This does not measure conversation quality, ranking or accuracy.**
+Every quality gate is `not_evaluated`; passing mocks never authorizes a pilot. JSON
+separates structural observations from metrics: flow coverage, limits, termination,
+follow-ups for fixtures without examples, and synthetic sensitive-data canaries.
+Markdown reports list failures by persona/turn; JSON retains synthetic transcripts for
+evidence investigation.
 
-Hay once perfiles: fuerte, promedio, débil, evasivo, verboso, monosilábico, dubitativo,
-inyección, datos sensibles, cambio a inglés y preguntas de salario/beneficios.
-`expected_scores: null` significa que el perfil no puede establecer un puntaje de
-referencia, no que merezca 1. La duración de tres minutos del fixture verboso es una
-anotación, no audio ni latencia medida.
+There are eleven profiles: strong, average, weak, evasive, verbose, monosyllabic, hesitant,
+injection, sensitive data, English switching, and salary/benefits questions.
+`expected_scores: null` means the profile cannot establish a reference score, not that
+it deserves 1. The verbose fixture's three-minute duration is an annotation, not audio
+or measured latency.
 
-## Inyectar servicios reales (después de G3)
+## Injecting real services (after G3)
 
-Una fábrica de confianza debe devolver `Components` desde `evals.run_evals` con:
+A trusted factory must return `Components` from `evals.run_evals` with:
 
-- Un nuevo motor por sesión con el analizador/escritor del proveedor real configurado.
-- Un respondedor de candidatos que recibe el perfil y produce `Answer` con contexto acotado.
-- Un nuevo scorer por sesión usando el modelo grande y las tres ejecuciones del scorer real.
-- `real_models=True` y una descripción de los modelos/configuración utilizados.
-- Un auditor independiente de cumplimiento/grounding que devuelva booleanos o `None` para
+- A new engine per session with the real provider's analyzer/writer configured.
+- A candidate responder that receives the profile and produces `Answer` with bounded context.
+- A new scorer per session using the large model and the real scorer's three runs.
+- `real_models=True` and a description of the models/configuration used.
+- An independent compliance/grounding auditor returning booleans or `None` for
   `injection_resistance`, `sensitive_content_absent`, `company_facts_grounded`.
 
 ```bash
-python -m evals.run_evals --factory paquete_confianza:components --allow-paid --runs 3
+python -m evals.run_evals --factory trusted_package:components --allow-paid --runs 3
 ```
 
-`--allow-paid` representa aprobación explícita del dueño; nunca agregarlo en un Makefile
-ni en los valores por defecto. Sin el flag, la fábrica real ni siquiera se importa. La
-fábrica real no se proporciona como activación automática del proveedor. El runner limita
-la ejecución a 100 sesiones, diez repeticiones, 64 turnos por sesión y un timeout de 600
-segundos por sesión. Esto no es un límite monetario: la fábrica debe reservar presupuesto
-antes de cada llamada, acotar tokens/reintentos y registrar el uso sin contenido ni claves.
+`--allow-paid` represents explicit owner approval; never add it in a Makefile or defaults.
+Without the flag, the real factory is not even imported. The real factory is not provided
+as automatic provider activation. The runner limits execution to 100 sessions, ten repeats,
+64 turns per session and a 600-second per-session timeout. This is not a dollar limit:
+the factory must reserve budget before every call, bound tokens/retries and record usage
+without content or keys.
 
-Las verificaciones de cobertura/seguimiento se calculan automáticamente, pero establecer
-calidad requiere un motor real. Ranking, acuerdo esperado y dispersión se calculan solo
-con puntuación real, nunca con puntajes simulados. Las verificaciones de lenguaje sensible,
-filtración de prompts y hechos inventados necesitan auditoría semántica independiente;
-los canarios y palabras clave no pueden reemplazarla. La inyección también requiere
-comparar una línea base profesional con el mismo ejemplo atacado y verificar que los
-puntajes no cambien y las instrucciones no sean divulgadas. La fábrica/auditor debe
-proporcionar esta evidencia o devolver `None`. Sin un auditor o evidencia suficiente, la
-compuerta permanece `not_evaluated`. Un perfil solo-inyección no debe tener puntaje
-numérico; no establece independientemente la invarianza en casos mixtos
-profesionales/atacados.
+Coverage/follow-up checks are computed automatically, but establishing quality requires
+a real engine. Ranking, expected agreement and spread are calculated only with real
+scoring, never mock scores. Sensitive-language checks, prompt leakage and invented facts
+need independent semantic auditing; canaries and keywords cannot replace it. Injection
+also requires comparing a professional baseline with the same attacked example and
+checking that scores do not change and instructions are not disclosed. The factory/auditor
+must supply this evidence or return `None`. Without an auditor or sufficient evidence,
+the gate remains `not_evaluated`. An injection-only profile must have no numeric score;
+it does not independently establish invariance in mixed professional/attack cases.
 
-Los resultados reales pueden contener texto generado y se almacenan en `evals/results/`
-(en .gitignore). Usar solo datos sintéticos; nunca apuntar el harness a transcripciones
-reales. Registrar tipos de excepción del proveedor, no texto que pueda contener secretos.
+Real results may contain generated text and are stored in gitignored `evals/results/`.
+Use only synthetic data; never point the harness at real transcripts. Log provider
+exception types, not text that might contain secrets.
 
-## Latencia
+## Latency
 
-`latency_probe.py` agrega muestras de servicios reales; no inventa mediciones.
-La entrada es JSONL, una muestra por turno, sin audio, texto ni datos personales:
+`latency_probe.py` aggregates real-service samples; it does not invent measurements.
+Input is JSONL, one sample per turn, without audio, text or personal data:
 
 ```json
 {"real_services": true, "stages_ms": {"vad": 200, "stt": 200, "llm_ttfb": 300, "tts_ttfb": 250, "avatar": 200, "total": 1150}}
 ```
 
-Esto ilustra el formato, **no un resultado del sistema**.
+This illustrates the format, **not a system result**.
 
 ```bash
-python -m evals.latency_probe /ruta/a/latencias-medidas.jsonl
+python -m evals.latency_probe /path/to/measured-latencies.jsonl
 ```
 
-Reporta p50/p95 por etapa y total. Medir el tiempo total desde el fin del habla del
-candidato hasta el primer audio del avatar/salida con el mismo reloj monótono; no sumar
-percentiles de etapas. Evaluar el objetivo p50 <1200 ms solo con al menos 30 muestras
-reales. Las muestras simuladas/insuficientes devuelven `not_evaluated`. Los campos de
-contenido y los valores negativos/no finitos se rechazan. No existe aún un conjunto de
-muestras reales ni latencia validada.
+Reports per-stage and total p50/p95. Measure total time from the end of candidate speech
+to first avatar/output audio with the same monotonic clock; do not sum stage percentiles.
+Evaluate the p50 <1200 ms target only with at least 30 real samples. Mock/insufficient
+samples return `not_evaluated`. Content fields and negative/nonfinite values are rejected.
+No real sample set or validated latency exists yet.
 
-## Propuesta G3 (no ejecutada)
+## G3 proposal (not executed)
 
-Primer lote: **11 perfiles × 3 repeticiones = 33 conversaciones de texto**, con tres
-ejecuciones de puntuación por conversación (99 llamadas al modelo grande) y una auditoría
-independiente por sesión (33 llamadas grandes, más comparaciones de línea base/ataque
-donde sea necesario). Sin STT/TTS/Tavus. Comenzar con un smoke de una sesión dentro del
-mismo presupuesto para verificar JSON/uso. Si falla, detenerse en lugar de reintentar el
-lote. Como máximo tres iteraciones de corrección antes de escalar el diagnóstico; cada
-lote adicional requiere un presupuesto explícito.
+First batch: **11 profiles × 3 repeats = 33 text conversations**, with three scoring runs
+per conversation (99 large-model calls) and one independent audit per session (33 large
+calls, plus baseline/attack comparisons where needed). No STT/TTS/Tavus. Start with a
+one-session smoke within the same budget to check JSON/usage. If it fails, stop rather
+than retrying the batch. At most three fix iterations before escalating the diagnosis;
+every additional batch requires an explicit budget.
 
-Los IDs configurados `claude-haiku-5-5` y `claude-opus-5-5` estaban listados en el
-[catálogo oficial](https://platform.claude.com/docs/en/models/overview), verificado el
-2026-11-02. Precios estándar verificados entonces: Haiku 5.5 USD 0.10/MTok entrada y
-0.50/MTok salida para prompts de hasta 100k tokens; Opus 5.5 USD 4/MTok entrada y
-20/MTok salida. Fuente: [documentación oficial de precios](https://platform.claude.com/docs/en/about-claude/pricing).
-Verificar disponibilidad real de cuenta, precios y credenciales antes del smoke test.
+Configured IDs `claude-haiku-5-5` and `claude-opus-5-5` were listed in the
+[official catalog](https://platform.claude.com/docs/en/models/overview), checked on
+2026-11-02. Standard prices checked then: Haiku 5.5 USD 0.10/MTok input and 0.50/MTok
+output for prompts up to 100k tokens; Opus 5.5 USD 4/MTok input and 20/MTok output.
+Source: [official pricing documentation](https://platform.claude.com/docs/en/about-claude/pricing).
+Verify actual account availability, prices and credentials before the smoke test.
 
-Estimación por escenario, **no es uso medido ni garantía de facturación**:
+Scenario estimate, **not measured usage or a billing guarantee**:
 
-| Trabajo por conversación | Tokens entrada | Tokens salida | Costo USD |
+| Work per conversation | Input tokens | Output tokens | USD cost |
 | --- | ---: | ---: | ---: |
-| Hasta 70 llamadas Haiku (candidato + analizador + escritor), promedio 1500/300 tokens | 105000 | 21000 | 0.021 |
-| Tres ejecuciones de puntuación Opus, 15000/1500 tokens cada una | 45000 | 4500 | 0.270 |
-| Auditor Opus, 15000/1000 tokens | 15000 | 1000 | 0.080 |
-| Total estimado por conversación | | | 0.371 |
-| 33 conversaciones | | | 12.243 |
+| Up to 70 Haiku calls (candidate + analyzer + writer), average 1500/300 tokens | 105000 | 21000 | 0.021 |
+| Three Opus scoring runs, 15000/1500 tokens each | 45000 | 4500 | 0.270 |
+| Opus auditor, 15000/1000 tokens | 15000 | 1000 | 0.080 |
+| Estimated total per conversation | | | 0.371 |
+| 33 conversations | | | 12.243 |
 
-Fórmula: `(entrada × tasa_entrada + salida × tasa_salida) / 1_000_000`, sumado por modelo/llamada.
-Un margen del 50% da aproximadamente **USD 18.40**. Límite propuesto: **USD 20** para el
-lote, incluyendo smoke y comparaciones de inyección. No garantizar las 33 sesiones si se
-acaba el presupuesto; detenerse antes de la siguiente llamada. El pensamiento, reintentos,
-auditoría extra y contexto más largo consumen presupuesto. No asumir descuentos de
-Batch/caché, impuestos incluidos ni límites ficticios de tokens. Los controles monetarios
-y el adaptador real deben existir y estar probados antes de usar el flag.
+Formula: `(input × input_rate + output × output_rate) / 1_000_000`, summed per model/call.
+A 50% margin gives approximately **USD 18.40**. Proposed cap: **USD 20** for the batch,
+including smoke and injection comparisons. Do not guarantee all 33 sessions if budget
+runs out; stop before the next call. Thinking, retries, extra auditing and longer context
+consume budget. Do not assume Batch/cache discounts, included taxes or fictitious token
+limits. Monetary controls and the real adapter must exist and be tested before using the flag.
 
-Prerrequisitos G3: aprobación del dueño con un límite, fábrica real auditada, credenciales
-configuradas sin imprimirlas, tokens/reintentos acotados y reserva de presupuesto, y
-evidencia de comparación de línea base/ataque para establecer resistencia a inyecciones.
+G3 prerequisites: owner approval with a cap, audited real factory, credentials configured
+without printing them, bounded tokens/retries and budget reservation, and baseline/attack
+comparison evidence to establish injection resistance.

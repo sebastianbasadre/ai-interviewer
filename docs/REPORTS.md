@@ -1,45 +1,42 @@
-# Informes basados en evidencia y revisión humana
+# Evidence-based reports and human review
 
-## Uso
+## Usage
 
-Abrir `https://192.168.2.6:8443/admin/review` e ingresar `ADMIN_API_KEY` desde `.env`.
-La clave permanece en memoria del navegador hasta el logout/recarga, nunca en localStorage,
-cookies ni URLs. La página de inicio de sesión es pública, pero la lista, los informes,
-las citas y la descarga HTML requieren la cabecera `X-Admin-Key`.
+Open `https://192.168.2.6:8443/admin/review` and enter `ADMIN_API_KEY` from `.env`.
+The key remains in browser memory until logout/reload, never localStorage, cookies or
+URLs. The login page is public, but the list, reports, citations and HTML download
+require the `X-Admin-Key` header.
 
-La lista muestra entrevistas y el estado del informe. Con la generación automática
-habilitada, el cierre normal inicia un trabajo en segundo plano. La entrevista termina
-inmediatamente; la evaluación aparece cuando las tres ejecuciones se completan. Generar/
-reintentar informes de entrevistas completadas desde la lista. Reintentar puede consumir
-otras tres evaluaciones; solicitar un informe ya almacenado devuelve el resultado existente
-sin otra llamada al proveedor.
+The list shows interviews and report status. With automatic generation enabled, normal
+closure starts a background job. The interview ends immediately; evaluation appears
+when all three runs complete. Generate/retry completed-interview reports from the list.
+Retrying can consume another three evaluations; requesting an already stored report
+returns the existing result without another provider call.
 
-Cada competencia muestra un puntaje de 1–5 o **Evidencia insuficiente**, fundamento,
-citas literales de fragmentos filtrados y la dispersión entre tres evaluaciones. Expandir
-los anclajes de la rúbrica para comparar puntajes. Los informes permanecen pendientes de
-revisión humana y nunca toman decisiones de contratación. La descarga HTML independiente
-escapa el contenido del candidato/modelo.
+Each competency displays a 1–5 score or **Insufficient evidence**, rationale, verbatim
+citations from filtered excerpts and the spread across three evaluations. Expand rubric
+anchors to compare scores. Reports remain pending human review and never make hiring
+decisions. The standalone HTML download escapes candidate/model content.
 
-## Evaluación
+## Evaluation
 
-`SCORING_ENABLED=true` usa Claude Opus 5.5 con la rúbrica aprobada y la transcripción
-profesional filtrada. Excluye perfiles de candidatos, audio, video y company_info.
-La sanitización es conservadora y léxica; no puede garantizar la anonimización de texto
-libre arbitrario. Validar las seis competencias, puntajes enteros 1–5 y referencias a
-turnos reales del candidato. Cada cita debe pertenecer a la competencia, excepto
-Comunicación, que acepta evidencia entre competencias. IDs desconocidos, turnos del
-entrevistador, duplicados y contenido excluido no pueden justificar un puntaje.
+`SCORING_ENABLED=true` uses Claude Opus 5.5 with the approved rubric and filtered
+professional transcript. It excludes candidate profiles, audio, video and company_info.
+Sanitization is conservative and lexical; it cannot guarantee anonymization of arbitrary
+free text. Validate all six competencies, integer scores 1–5 and references to actual
+candidate turns. Each citation must belong to the competency, except Communication,
+which accepts evidence across competencies. Unknown IDs, interviewer turns, duplicates
+and excluded content cannot justify a score.
 
-Ejecutar tres evaluaciones. Si alguna encuentra evidencia insuficiente, dejar el puntaje
-final como `null`; nunca convertirlo automáticamente en 1. Con tres números válidos, usar
-la mediana junto con el fundamento/citas de esa evaluación. Marcar diferencias mayores a
-un punto. Nunca publicar un informe parcial sin tres evaluaciones válidas.
+Run three evaluations. If any finds insufficient evidence, leave the final score `null`;
+never automatically turn it into 1. With three valid numbers, use the median together
+with that evaluation's rationale/citations. Flag differences greater than one point.
+Never publish a partial report without three valid evaluations.
 
-Esto valida estructura y referencias, no relevancia semántica, calibración ni ausencia de
-sesgo. El ejemplo retenido es completamente sintético, no es una evaluación de una persona
-real.
+This validates structure and references, not semantic relevance, calibration or absence
+of bias. The retained example is entirely synthetic, not an evaluation of a real person.
 
-## Configuración
+## Configuration
 
 ```dotenv
 ANTHROPIC_API_KEY=
@@ -50,52 +47,48 @@ SCORING_MAX_CALLS=12
 SCORING_TIMEOUT_SECONDS=45
 ```
 
-Requiere el extra `llm` basado en HTTPX. La plantilla deja el flag deshabilitado por
-defecto. `APP_MODE=mock` retiene el motor de demo; `/` distingue los proveedores de
-conversación/puntuación por separado. Construir o iniciar la app no llama a Opus.
+Requires the HTTPX-based `llm` extra. The template leaves the flag disabled by default.
+`APP_MODE=mock` retains the demo engine; `/` distinguishes conversation/scoring providers
+separately. Constructing or starting the app does not call Opus.
 
-Cada informe reserva atómicamente tres intentos en `DATA_DIR/scoring-budget.sqlite3`.
-El límite global persiste entre entrevistas, reconexiones y reinicios. Sin reintentos
-automáticos. Los fallos, cancelaciones y rechazos de schema también consumen reservas
-conservadoras. El modelo recibe como máximo 50000 caracteres / 100000 bytes de contexto
-y genera como máximo 4096 tokens por ejecución. Estos límites no son un presupuesto
-monetario.
+Each report atomically reserves three attempts in `DATA_DIR/scoring-budget.sqlite3`.
+The global limit persists across interviews, reconnects and restarts. No automatic retries.
+Failures, cancellations and schema rejections also consume conservative reservations.
+The model receives at most 50000 characters / 100000 bytes of context and generates at
+most 4096 tokens per run. These bounds are not a monetary budget.
 
-Las claves faltantes causan rechazo en el inicio nombrando el campo. Los errores/salida
-inválida dejan un trabajo fallido que requiere reintento explícito. Al reiniciar, los
-trabajos interrumpidos se marcan como fallidos en lugar de facturarse automáticamente
-de nuevo. Los informes almacenados sobreviven. Eliminar una entrevista también elimina
-su informe/estado de trabajo; el contador global de uso se retiene y no contiene datos
-personales.
+Missing keys cause startup rejection naming the field. Errors/invalid output leave a
+failed job requiring explicit retry. On restart, interrupted jobs become failed rather
+than being automatically billed again. Stored reports survive. Deleting an interview
+also deletes its report/job status; the global usage counter is retained and contains
+no personal data.
 
-## Consentimiento y privacidad
+## Consent and privacy
 
-Habilitar la puntuación agrega un aviso explícito: Anthropic recibe la rúbrica y fragmentos
-de la transcripción para proponer puntajes con citas para revisión humana. Crear una nueva
-invitación después de habilitarlo. El aviso anterior de puntuación simulada no autoriza
-evaluación real; el inicio/reanudación/envío de respuestas o la generación de informes
-reales con ese consentimiento se rechaza. Los informes simulados existentes permanecen
-etiquetados como registros históricos. Los candidatos pueden finalizar sesiones antiguas
-sin autorizar la puntuación real.
+Enabling scoring adds an explicit notice: Anthropic receives the rubric and transcript
+excerpts to propose scores with citations for human review. Create a new invitation
+after enabling it. The previous mock-scoring notice does not authorize real evaluation;
+start/resume/answer submission or real report generation with that consent is rejected.
+Existing mock reports remain labeled historical records. Candidates can end old sessions
+without authorizing real scoring.
 
 ## Endpoints
 
-- `GET /admin/review`: shell de inicio de sesión y revisión; no contiene datos privados.
-- `GET /admin/interviews`: lista autenticada, estado de sesión/informe, modo de puntuación.
-- `POST /admin/interviews/{id}/report`: generar o devolver el informe existente.
-- `GET /admin/interviews/{id}/report`: JSON validado.
-- `GET /admin/interviews/{id}/review`: informe, citas filtradas y rúbrica para la UI.
-- `GET /admin/interviews/{id}/report.html`: descarga autenticada para revisión humana.
+- `GET /admin/review`: login and review shell; contains no private data.
+- `GET /admin/interviews`: authenticated list, session/report status, scoring mode.
+- `POST /admin/interviews/{id}/report`: generate or return the existing report.
+- `GET /admin/interviews/{id}/report`: validated JSON.
+- `GET /admin/interviews/{id}/review`: report, filtered citations and rubric for the UI.
+- `GET /admin/interviews/{id}/report.html`: authenticated download for human review.
 
-## Verificación real — 2026-11-04
+## Real verification — 2026-11-04
 
-Usado `evals/report_fixture.py`: seis competencias, omitiendo deliberadamente un ejemplo
-de Métricas. Opus dejó Métricas null y citó evidencia existente para los cinco puntajes
-numéricos. Tres ejecuciones completadas en aproximadamente 33 segundos. Un rechazo de
-API de enum nullable se corrigió usando anyOf y validación de rango local estricta. Sin
-sesiones Tavus utilizadas. Verificación en Chrome: seis competencias, siete citas y seis
-rúbricas; descarga HTML válida, logout y cero errores JavaScript. Suite final en ese punto
-de control: 140 pruebas.
+Used `evals/report_fixture.py`: six competencies, deliberately omitting a Metrics example.
+Opus left Metrics null and cited existing evidence for the five numeric scores. Three
+runs completed in approximately 33 seconds. A nullable-score enum API rejection was
+fixed using anyOf and strict local range validation. No Tavus sessions were used.
+Chrome verification: six competencies, seven citations and six rubrics; valid HTML
+download, logout and zero JavaScript errors. Final suite at that checkpoint: 140 tests.
 
-Fuente del modelo/precios: https://platform.claude.com/docs/en/models/opus-5-5/overview.
-JSON estructurado: https://platform.claude.com/docs/en/build-with-claude/structured-outputs.
+Model/pricing source: https://platform.claude.com/docs/en/models/opus-5-5/overview.
+Structured JSON: https://platform.claude.com/docs/en/build-with-claude/structured-outputs.
