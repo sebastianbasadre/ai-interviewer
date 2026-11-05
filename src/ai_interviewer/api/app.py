@@ -354,7 +354,7 @@ def create_app(
             await authorize(request, interview.id)
         elif interview.status != "consented" or clock() >= interview.expires_at:
             raise HTTPException(403, "Please give consent first.")
-        return room_page(token, interview.id, realtime=settings.realtime_enabled, tavus=settings.tavus_enabled, english_voice=settings.piper_english_voice)
+        return room_page(token, interview.id, realtime=settings.realtime_enabled, tavus=settings.tavus_enabled, svg=settings.avatar_mode == "svg", english_voice=settings.piper_english_voice)
 
     @app.post("/i/{token}/start")
     async def start(token: str, request: Request):

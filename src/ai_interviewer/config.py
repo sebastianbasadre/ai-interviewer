@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     stt_provider: Literal["whisper_local", "openai"] = "whisper_local"
     whisper_model: str = "large-v3-turbo"
     whisper_device: Literal["cuda", "cpu"] = "cuda"
-    avatar_mode: Literal["mock", "tavus"] = "mock"
+    avatar_mode: Literal["mock", "tavus", "svg"] = "mock"
     tavus_max_minutes_per_session: int = Field(default=30, ge=1, le=30)
     public_base_url: str = "http://localhost:8000"
     allow_mock_lan_http: bool = False
