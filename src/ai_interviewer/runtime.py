@@ -80,6 +80,8 @@ def build_app(settings: Settings | None = None, *, roles_dir: Path = Path("roles
     app.state.conversation_mode = "anthropic" if settings.conversation_enabled else "mock"
     app.state.scoring_mode = "anthropic" if settings.scoring_enabled else "mock"
     app.state.server_options = {"port": settings.listen_port}
+    if settings.allow_mock_lan_http:
+        app.state.server_options["host"] = "0.0.0.0"
     if bool(settings.tls_cert_file) != bool(settings.tls_key_file):
         raise StartupError("Configure both TLS_CERT_FILE and TLS_KEY_FILE.")
     if settings.tls_cert_file:
