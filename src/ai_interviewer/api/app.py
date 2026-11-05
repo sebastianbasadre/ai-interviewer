@@ -388,7 +388,7 @@ def create_app(
                 raise
             response = JSONResponse({"id": str(interview.id), "decision": decision.model_dump(mode="json")})
             if not decision.end_session:
-                response.set_cookie(cookie_name(interview.id), key, max_age=(settings.interview_max_minutes + 60) * 60, httponly=True, secure=origin.scheme == "https", samesite="strict", path="/")
+                response.set_cookie(cookie_name(interview.id), key, max_age=(settings.interview_max_minutes + 60) * 60, httponly=True, secure=origin.scheme == "https", samesite="lax", path="/")
             return response
 
     @app.post("/session/{interview_id}/turn")
