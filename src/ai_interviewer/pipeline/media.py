@@ -177,7 +177,10 @@ class MediaManager:
 
                 @transport.event_handler("on_client_connected")
                 async def connected(transport, client):
-                    peer.connection.send_app_message({"type": "media-ready", "avatar": self.settings.tavus_enabled})
+                    avatar_type = ("tavus" if self.settings.tavus_enabled
+                                   else "svg" if self.settings.avatar_mode == "svg"
+                                   else None)
+                    peer.connection.send_app_message({"type": "media-ready", "avatar": avatar_type})
                     await worker.queue_frame(TTSSpeakFrame(text=initial_text))
 
                 @transport.event_handler("on_client_disconnected")

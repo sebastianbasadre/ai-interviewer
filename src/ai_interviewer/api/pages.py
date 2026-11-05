@@ -8,7 +8,7 @@ STYLE = """
 @media(max-width:950px){.room-grid{grid-template-columns:minmax(0,1fr) 250px;gap:18px}.side-card,.language-card{padding:18px}h1{font-size:34px}.consent-layout{grid-template-columns:240px minmax(0,1fr);gap:30px}.stage{aspect-ratio:4/3}.stage-controls{padding:15px}.stage-caption{display:none}}
 @media(max-width:740px){.app-header{height:70px;padding:0 22px}main{padding:30px 20px 12px}.header-note{font-size:10px}.brand{font-size:16px}.page-heading{align-items:flex-start;margin-bottom:23px;gap:12px}.page-heading .pill{font-size:0;padding:10px;gap:0}.page-heading h1{font-size:32px;letter-spacing:-1px}.page-heading p{font-size:12px}.room-grid{grid-template-columns:1fr}.stage{aspect-ratio:4/3}.stage-top{left:16px;right:16px;top:16px}.stage-bottom{left:16px}.stage-controls{gap:10px}.stage-controls .actions{flex:1}.stage-controls #start{flex:1}.stage-placeholder h2{font-size:20px}.orb{width:90px;height:90px;margin-bottom:22px}.side-column{display:grid;grid-template-columns:1fr 1fr;gap:14px}.side-card{margin-bottom:0}.language-card{grid-column:1/-1}.language-badges{margin-top:10px}.room-note{align-items:flex-start}.app-footer{padding:20px;font-size:9px}.consent-layout{display:block;margin:0}.consent-intro{position:static}.consent-intro h1{font-size:36px}.consent-intro .side-card{display:none}.consent-content{padding:22px;margin-top:25px}.consent-intro>p{max-width:440px}}
 @media(max-width:400px){.side-column{grid-template-columns:1fr}.language-card{grid-column:auto}.stage-placeholder{padding:50px 16px}.stage-number{display:none}.stage-label{font-size:9px}.app-footer{flex-direction:column;gap:7px}.room-note{flex-direction:column;gap:12px}}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+#svg-avatar{position:absolute;inset:0;width:100%;height:100%;background:#142d27}.stage:has(#svg-avatar:not([hidden])) .stage-placeholder{display:none}@media(prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
 """
 
 
@@ -40,7 +40,7 @@ def consent_page(token: str, days: int, contact: str, *, realtime: bool = False,
 """, "consent")
 
 
-def room_page(token: str, interview_id: UUID, *, realtime: bool = False, tavus: bool = False, english_voice: str = "") -> str:
+def room_page(token: str, interview_id: UUID, *, realtime: bool = False, tavus: bool = False, svg: bool = False, english_voice: str = "") -> str:
     media_notice = ("Start automatically connects your microphone and the interviewer. Use headphones to prevent echo. Your camera is not required. Answer in English or Spanish; the interviewer will follow your language." if realtime else
                     "Audio and avatar are not available yet. You can test your devices locally without recording or uploading them.")
     if realtime and not tavus:
@@ -53,7 +53,7 @@ def room_page(token: str, interview_id: UUID, *, realtime: bool = False, tavus: 
 <div class="stage-card"><div class="stage">
 <div class="stage-top"><span class="stage-label"><span class="dot" aria-hidden="true"></span>AI INTERVIEWER</span><span class="stage-number">YOUR STORY. YOUR PACE.</span></div>
 <div class="stage-placeholder"><div class="orb" aria-hidden="true"><div class="soundwave"><i></i><i></i><i></i><i></i><i></i></div></div><h2 id="stage-title">{"Your interviewer will be here" if tavus else "Your conversation starts here"}</h2><p id="stage-hint">{"Take a breath. When you are ready, start the conversation." if realtime else "Share your experience in the text conversation below."}</p></div>
-<video id="avatar" autoplay playsinline hidden aria-label="AI generated interviewer avatar"></video><audio id="interviewer-audio" autoplay></audio>
+<svg id="svg-avatar" viewBox="0 0 400 500" xmlns="http://www.w3.org/2000/svg" hidden aria-hidden="true"><defs><radialGradient id="av-sg" cx="38%" cy="30%" r="65%"><stop offset="0%" stop-color="#f0d0a0"/><stop offset="100%" stop-color="#c89050"/></radialGradient><radialGradient id="av-sg2" cx="38%" cy="30%" r="65%"><stop offset="0%" stop-color="#d4a870"/><stop offset="100%" stop-color="#b87840"/></radialGradient></defs><rect width="400" height="500" fill="#142d27"/><ellipse cx="200" cy="430" rx="260" ry="190" fill="#1a3028"/><polygon points="170,418 200,458 230,418 218,398 200,413 182,398" fill="#f8f4ee"/><polygon points="78,500 170,418 182,398 128,500" fill="#1e3830"/><polygon points="322,500 230,418 218,398 272,500" fill="#1e3830"/><ellipse cx="200" cy="395" rx="28" ry="30" fill="url(#av-sg)"/><ellipse cx="200" cy="225" rx="98" ry="118" fill="url(#av-sg)"/><path d="M 103 190 Q 102 93 200 83 Q 298 93 297 190 Q 290 133 260 110 Q 230 93 200 91 Q 170 93 140 110 Q 110 133 103 190 Z" fill="#2a1c10"/><ellipse cx="102" cy="238" rx="12" ry="17" fill="url(#av-sg2)"/><ellipse cx="298" cy="238" rx="12" ry="17" fill="url(#av-sg2)"/><path d="M 148 183 Q 168 174 192 180" stroke="#2a1c10" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M 208 180 Q 232 174 252 183" stroke="#2a1c10" stroke-width="4" fill="none" stroke-linecap="round"/><ellipse cx="170" cy="207" rx="21" ry="13" fill="white"/><ellipse cx="170" cy="207" rx="10" ry="10" fill="#5a3e28"/><ellipse cx="170" cy="207" rx="5.5" ry="5.5" fill="#120e08"/><ellipse cx="174" cy="203" rx="2.5" ry="2" fill="white" opacity="0.9"/><ellipse cx="230" cy="207" rx="21" ry="13" fill="white"/><ellipse cx="230" cy="207" rx="10" ry="10" fill="#5a3e28"/><ellipse cx="230" cy="207" rx="5.5" ry="5.5" fill="#120e08"/><ellipse cx="234" cy="203" rx="2.5" ry="2" fill="white" opacity="0.9"/><ellipse id="av-bl" cx="170" cy="207" rx="21" ry="0" fill="url(#av-sg)"/><ellipse id="av-br" cx="230" cy="207" rx="21" ry="0" fill="url(#av-sg)"/><ellipse cx="200" cy="258" rx="7" ry="5" fill="#b07838" opacity="0.4"/><ellipse id="av-cav" cx="200" cy="302" rx="33" ry="1" fill="#5a1a16"/><rect id="av-teeth" x="167" y="295" width="66" height="12" rx="3" fill="white" opacity="0"/><path id="av-lip-t" d="M 166 302 Q 183 295 200 297 Q 217 295 234 302" fill="#c08068" stroke="#a06050" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path id="av-lip-b" d="M 166 302 Q 200 310 234 302" fill="#c08068" stroke="#a06050" stroke-width="2" stroke-linecap="round"/></svg><video id="avatar" autoplay playsinline hidden aria-label="AI generated interviewer avatar"></video><audio id="interviewer-audio" autoplay></audio>
 <div class="stage-bottom"><span>AI generated · Reviewed by a person</span></div>
 </div><div class="stage-controls"><div class="stage-caption"><span class="dot" aria-hidden="true"></span><span id="connection-label">{"Microphone not connected" if realtime else "Text interview"}</span></div><div class="actions"><button id="start" type="button">Start or resume <span aria-hidden="true">→</span></button><button id="finish" class="danger" type="button" disabled hidden>End interview</button></div></div></div>
 <div class="status-line"><span class="dot" aria-hidden="true"></span><div><p id="status" role="status">{"Start to meet the interviewer and discuss your professional background in voice and video." if realtime else "This is a text interview. Recording starts when you select Start."}</p><p id="media-status" role="status"></p></div></div>
@@ -63,7 +63,7 @@ def room_page(token: str, interview_id: UUID, *, realtime: bool = False, tavus: 
 <form id="answer" {"hidden" if realtime else ""}><label for="text">Your answer</label><textarea id="text" maxlength="12000" placeholder="Share a specific example from your experience…" required disabled></textarea><button type="submit" id="send" disabled>Send answer <span aria-hidden="true">→</span></button></form>
 <form id="survey" hidden><p class="eyebrow">Thank you for your time</p><h2>How was your experience?</h2><label>Were the instructions clear? <select id="clarity">{options()}</select></label><label>Did you feel you were treated fairly? <select id="fairness">{options()}</select></label><label>Optional comment<textarea id="comment" maxlength="2000" placeholder="Anything you would like us to know?"></textarea></label><button type="submit">Send feedback</button></form>
 </section><aside class="side-column" aria-label="Interview preparation">
-<section class="side-card"><h2>The conversation</h2><div class="session-row"><span>Focus</span><strong>Product experience</strong></div><div class="session-row"><span>Format</span><strong>{"Voice & AI video" if tavus else "Voice" if realtime else "Text"}</strong></div><div class="session-row"><span>Review</span><strong>Always human</strong></div><hr><p class="muted" style="font-size:12px;margin:0">Real examples are all you need. There is no perfect answer.</p></section>
+<section class="side-card"><h2>The conversation</h2><div class="session-row"><span>Focus</span><strong>Product experience</strong></div><div class="session-row"><span>Format</span><strong>{"Voice & AI video" if tavus else "Voice & AI avatar" if (svg and realtime) else "Voice" if realtime else "Text"}</strong></div><div class="session-row"><span>Review</span><strong>Always human</strong></div><hr><p class="muted" style="font-size:12px;margin:0">Real examples are all you need. There is no perfect answer.</p></section>
 <section class="side-card"><h2>A quick sound check</h2><ul class="check-list"><li><span class="check-mark" aria-hidden="true">✓</span>Find a quiet, comfortable spot</li><li><span class="check-mark" aria-hidden="true">✓</span>Headphones help prevent echo</li><li><span class="check-mark" aria-hidden="true">✓</span>Your camera is optional</li></ul><button id="devices" class="secondary" type="button">Test microphone & camera</button><video id="preview" muted playsinline hidden aria-label="Local camera preview"></video><p id="device-status" role="status"></p><meter id="mic-level" min="0" max="1" value="0" hidden aria-label="Microphone level"></meter></section>
 <section class="language-card"><h3>Your words. Your language.</h3><p>Start in English or Spanish. Your interviewer will follow your language naturally.</p><div class="language-badges"><span>English</span><span>Español</span></div></section>
 </aside></div>
@@ -96,6 +96,7 @@ ROOM_JS = r"""
 const room=document.querySelector('#room'), status=document.querySelector('#status'), error=document.querySelector('#error');
 const start=document.querySelector('#start'), finish=document.querySelector('#finish'), text=document.querySelector('#text'), send=document.querySelector('#send');
 let active=false, ended=false, stream=null, peer=null, microphone=null, heartbeat=null, mediaBusy=false, deviceTimer=null, meterTimer=null, audioContext=null, disconnectTimer=null;
+let svgMode=false,svgCtx=null,svgAna=null,svgRaf=null,svgOpen=0,svgBlink=null;
 const realtime=room.dataset.realtime==='true';
 const connectMedia=document.querySelector('#connect-media'), disconnectMedia=document.querySelector('#disconnect-media');
 function append(speaker,message){const item=document.createElement('li');item.className=speaker;item.textContent=(speaker==='candidate'?'You: ':'AI interviewer: ')+message;document.querySelector('#conversation').append(item);}
@@ -124,7 +125,7 @@ document.querySelector('#devices').addEventListener('click',async()=>{
  }catch(e){stopDevices();result.textContent=deviceError(e);}
 });
 document.querySelector('#mute').addEventListener('click',()=>{if(!microphone)return;const button=document.querySelector('#mute');const muted=button.getAttribute('aria-pressed')!=='true';microphone.getAudioTracks().forEach(track=>track.enabled=!muted);button.setAttribute('aria-pressed',String(muted));button.textContent=muted?'Unmute microphone':'Mute microphone';document.querySelector('#connection-label').textContent=muted?'Microphone muted':'Microphone connected';});
-function stopMedia(){if(active&&!ended){document.querySelector('#stage-title').textContent='Ready to reconnect';document.querySelector('#stage-hint').textContent='Reconnect the interviewer or continue by text below.';}document.querySelector('#mute').setAttribute('aria-pressed','false');document.querySelector('#mute').textContent='Mute microphone';clearTimeout(disconnectTimer);clearInterval(heartbeat);heartbeat=null;if(microphone){microphone.getTracks().forEach(t=>t.stop());microphone=null;}if(peer){peer.close();peer=null;}document.querySelector('#avatar').hidden=true;document.querySelector('#avatar').srcObject=null;document.querySelector('#interviewer-audio').srcObject=null;document.querySelector('#media-status').textContent='Microphone disconnected.';controls(false);}
+function stopMedia(){stopSvgAnimation();svgMode=false;if(active&&!ended){document.querySelector('#stage-title').textContent='Ready to reconnect';document.querySelector('#stage-hint').textContent='Reconnect the interviewer or continue by text below.';}document.querySelector('#mute').setAttribute('aria-pressed','false');document.querySelector('#mute').textContent='Mute microphone';clearTimeout(disconnectTimer);clearInterval(heartbeat);heartbeat=null;if(microphone){microphone.getTracks().forEach(t=>t.stop());microphone=null;}if(peer){peer.close();peer=null;}document.querySelector('#avatar').hidden=true;document.querySelector('#avatar').srcObject=null;document.querySelector('#interviewer-audio').srcObject=null;document.querySelector('#media-status').textContent='Microphone disconnected.';controls(false);}
 async function disconnect(){stopMedia();try{await post(room.dataset.session+'/media/close');}catch(e){error.textContent=e.message;}}
 disconnectMedia.addEventListener('click',disconnect);
 document.querySelector('#text-mode').addEventListener('click',async()=>{await disconnect();document.querySelector('#conversation').hidden=false;document.querySelector('#answer').hidden=false;});
@@ -144,8 +145,8 @@ async function connect(){
   current.addTransceiver('video',{direction:'inactive'});
   const channel=current.createDataChannel('chat');
   channel.addEventListener('open',()=>{heartbeat=setInterval(()=>{if(channel.readyState==='open')channel.send('ping');},1000);});
-  channel.addEventListener('message',event=>{try{const msg=JSON.parse(event.data);if(msg.type==='interview-turn'){append('candidate',msg.candidate);decision(msg.decision);controls(false);}else if(msg.type==='media-ready'){document.querySelector('#stage-title').textContent='Your interviewer is here';document.querySelector('#stage-hint').textContent='Listen, then share your experience in your own words.';document.querySelector('#media-status').textContent=msg.avatar?'Microphone active · voice and avatar connected.':'Microphone active · voice connected.';}else if(msg.type==='media-error'){error.textContent=msg.message;disconnect();}}catch(e){error.textContent='Invalid audio message.';}});
-  current.addEventListener('track',async event=>{const media=new MediaStream([event.track]);const target=document.querySelector(event.track.kind==='video'?'#avatar':'#interviewer-audio');target.srcObject=media;if(event.track.kind==='video')target.addEventListener('loadeddata',()=>{target.hidden=false;},{once:true});try{await target.play();}catch(e){error.textContent='Your browser blocked playback. Allow audio for this site.';}});
+  channel.addEventListener('message',event=>{try{const msg=JSON.parse(event.data);if(msg.type==='interview-turn'){append('candidate',msg.candidate);decision(msg.decision);controls(false);}else if(msg.type==='media-ready'){document.querySelector('#stage-title').textContent='Your interviewer is here';document.querySelector('#stage-hint').textContent='Listen, then share your experience in your own words.';document.querySelector('#media-status').textContent=msg.avatar?'Microphone active · voice and avatar connected.':'Microphone active · voice connected.';if(msg.avatar==='svg'){svgMode=true;startSvgBlink();}}else if(msg.type==='media-error'){error.textContent=msg.message;disconnect();}}catch(e){error.textContent='Invalid audio message.';}});
+  current.addEventListener('track',async event=>{const media=new MediaStream([event.track]);const target=document.querySelector(event.track.kind==='video'?'#avatar':'#interviewer-audio');target.srcObject=media;if(event.track.kind==='video')target.addEventListener('loadeddata',()=>{target.hidden=false;},{once:true});try{await target.play();if(event.track.kind==='audio'&&svgMode)startSvgAnimation(target);}catch(e){error.textContent='Your browser blocked playback. Allow audio for this site.';}});
   current.addEventListener('connectionstatechange',()=>{if(current!==peer)return;clearTimeout(disconnectTimer);if(['failed','closed'].includes(current.connectionState))disconnect();else if(current.connectionState==='disconnected'){document.querySelector('#media-status').textContent='Connection interrupted. Reconnecting…';disconnectTimer=setTimeout(()=>{if(current===peer&&current.connectionState==='disconnected')disconnect();},8000);}});
   await current.setLocalDescription(await current.createOffer());
   if(current.iceGatheringState!=='complete')await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Could not prepare the audio connection. Check connectivity to the TURN server and reconnect.')),25000);current.addEventListener('icegatheringstatechange',()=>{if(current.iceGatheringState==='complete'){clearTimeout(timer);resolve();}});});
@@ -153,5 +154,51 @@ async function connect(){
   await current.setRemoteDescription({sdp:answer.sdp,type:answer.type});
  }catch(e){error.textContent=e.message;await disconnect();}finally{mediaBusy=false;controls(false);}
 }
+function startSvgAnimation(el){
+ const svg=document.querySelector('#svg-avatar');
+ if(!svg||svgCtx)return;
+ try{
+  svgCtx=new AudioContext();
+  svgAna=svgCtx.createAnalyser();
+  svgAna.fftSize=256;svgAna.smoothingTimeConstant=0.6;
+  const src=svgCtx.createMediaElementSource(el);
+  src.connect(svgAna);src.connect(svgCtx.destination);
+ }catch(e){return;}
+ const data=new Uint8Array(svgAna.frequencyBinCount);
+ const cav=svg.querySelector('#av-cav'),lipB=svg.querySelector('#av-lip-b'),teeth=svg.querySelector('#av-teeth');
+ function tick(){
+  svgRaf=requestAnimationFrame(tick);
+  svgAna.getByteFrequencyData(data);
+  let sum=0;for(let i=2;i<10;i++)sum+=data[i];
+  const amp=sum/(8*255);
+  svgOpen+=(amp-svgOpen)*0.25;
+  const ry=svgOpen*22;
+  cav.setAttribute('ry',ry.toFixed(1));
+  lipB.setAttribute('d','M 166 302 Q 200 '+(302+ry*1.2).toFixed(1)+' 234 302');
+  if(teeth)teeth.setAttribute('opacity',Math.min(0.9,(Math.max(0,svgOpen-0.15)*3)).toFixed(2));
+ }
+ tick();
+ svg.hidden=false;
+}
+function stopSvgAnimation(){
+ if(svgRaf){cancelAnimationFrame(svgRaf);svgRaf=null;}
+ if(svgCtx){svgCtx.close();svgCtx=null;svgAna=null;}
+ svgOpen=0;stopSvgBlink();
+ const svg=document.querySelector('#svg-avatar');
+ if(svg)svg.hidden=true;
+}
+function startSvgBlink(){
+ stopSvgBlink();
+ function blink(){
+  svgBlink=setTimeout(()=>{
+   const bl=document.querySelector('#av-bl'),br=document.querySelector('#av-br');
+   if(!bl){svgBlink=null;return;}
+   bl.setAttribute('ry','13');br.setAttribute('ry','13');
+   setTimeout(()=>{bl.setAttribute('ry','0');br.setAttribute('ry','0');blink();},130);
+  },2800+Math.random()*2500);
+ }
+ blink();
+}
+function stopSvgBlink(){if(svgBlink){clearTimeout(svgBlink);svgBlink=null;}}
 window.addEventListener('pagehide',()=>{stopDevices();stopMedia();fetch(room.dataset.session+'/media/close',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}',keepalive:true}).catch(()=>{});});
 """
