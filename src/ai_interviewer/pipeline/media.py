@@ -142,6 +142,7 @@ class MediaManager:
                         decision = await submit(frame.text)
                         peer.connection.send_app_message({"type": "interview-turn", "candidate": frame.text, "decision": decision})
                         if decision["text"]:
+                            last_spoken[0] = decision["text"]
                             await self.push_frame(TTSSpeakFrame(text=decision["text"]))
                         if decision["end_session"]:
                             await peer.worker.stop_when_done()
@@ -188,13 +189,23 @@ class MediaManager:
                 peer.runner = runner
                 await runner.add_workers(worker)
 
+                last_spoken = [initial_text]
+
                 @transport.event_handler("on_client_connected")
                 async def connected(transport, client):
                     avatar_type = ("tavus" if self.settings.tavus_enabled
                                    else "svg" if self.settings.avatar_mode == "svg"
                                    else None)
                     peer.connection.send_app_message({"type": "media-ready", "avatar": avatar_type})
+                    # Delay TTS slightly so the browser track event fires first.
+                    await asyncio.sleep(0.5)
                     await worker.queue_frame(TTSSpeakFrame(text=initial_text))
+
+                @transport.event_handler("on_app_message")
+                async def on_app_message(transport, message, sender):
+                    # Browser signals that its audio element is now playing.
+                    if isinstance(message, dict) and message.get("type") == "audio-ready":
+                        await worker.queue_frame(TTSSpeakFrame(text=last_spoken[0]))
 
                 @transport.event_handler("on_client_disconnected")
                 async def disconnected(transport, client):

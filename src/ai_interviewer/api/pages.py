@@ -146,7 +146,26 @@ async function connect(){
   const channel=current.createDataChannel('chat');
   channel.addEventListener('open',()=>{heartbeat=setInterval(()=>{if(channel.readyState==='open')channel.send('ping');},1000);});
   channel.addEventListener('message',event=>{try{const msg=JSON.parse(event.data);if(msg.type==='interview-turn'){append('candidate',msg.candidate);decision(msg.decision);controls(false);}else if(msg.type==='media-ready'){document.querySelector('#stage-title').textContent='Your interviewer is here';document.querySelector('#stage-hint').textContent='Listen, then share your experience in your own words.';document.querySelector('#media-status').textContent=msg.avatar?'Microphone active · voice and avatar connected.':'Microphone active · voice connected.';if(msg.avatar==='svg'){svgMode=true;startSvgBlink();}}else if(msg.type==='media-error'){error.textContent=msg.message;disconnect();}}catch(e){error.textContent='Invalid audio message.';}});
-  current.addEventListener('track',async event=>{const media=new MediaStream([event.track]);const target=document.querySelector(event.track.kind==='video'?'#avatar':'#interviewer-audio');target.srcObject=media;if(event.track.kind==='video')target.addEventListener('loadeddata',()=>{target.hidden=false;},{once:true});try{await target.play();if(event.track.kind==='audio'&&svgMode)startSvgAnimation(target);}catch(e){document.querySelector('#media-status').textContent='Click anywhere on the page to start audio.';document.addEventListener('click',async function resume(){try{await target.play();if(event.track.kind==='audio'&&svgMode)startSvgAnimation(target);}catch(_){}document.removeEventListener('click',resume);},{once:true});}})
+  current.addEventListener('track',async event=>{
+    const media=new MediaStream([event.track]);
+    const isAudio=event.track.kind==='audio';
+    const target=document.querySelector(isAudio?'#interviewer-audio':'#avatar');
+    target.srcObject=media;
+    if(!isAudio){target.addEventListener('loadeddata',()=>{target.hidden=false;},{once:true});}
+    if(!isAudio){try{await target.play();}catch(_){}return;}
+    async function tryPlay(){
+      try{
+        await target.play();
+        document.querySelector('#media-status').textContent='Audio connected · listening for the interviewer.';
+        startSvgAnimation(target);
+        if(channel.readyState==='open')channel.send(JSON.stringify({type:'audio-ready'}));
+      }catch(e){
+        document.querySelector('#media-status').textContent='Click anywhere on the page to start audio.';
+        document.addEventListener('click',function retry(){document.removeEventListener('click',retry);tryPlay();},{once:true});
+      }
+    }
+    await tryPlay();
+  });
   current.addEventListener('connectionstatechange',()=>{if(current!==peer)return;clearTimeout(disconnectTimer);if(['failed','closed'].includes(current.connectionState))disconnect();else if(current.connectionState==='disconnected'){document.querySelector('#media-status').textContent='Connection interrupted. Reconnecting…';disconnectTimer=setTimeout(()=>{if(current===peer&&current.connectionState==='disconnected')disconnect();},8000);}});
   await current.setLocalDescription(await current.createOffer());
   if(current.iceGatheringState!=='complete')await new Promise((resolve,reject)=>{const timer=setTimeout(()=>reject(new Error('Could not prepare the audio connection. Check connectivity to the TURN server and reconnect.')),25000);current.addEventListener('icegatheringstatechange',()=>{if(current.iceGatheringState==='complete'){clearTimeout(timer);resolve();}});});
@@ -189,6 +208,8 @@ function stopSvgAnimation(){
 }
 function startSvgBlink(){
  stopSvgBlink();
+ const svg=document.querySelector('#svg-avatar');
+ if(svg)svg.hidden=false;
  function blink(){
   svgBlink=setTimeout(()=>{
    const bl=document.querySelector('#av-bl'),br=document.querySelector('#av-br');
