@@ -14,8 +14,10 @@ def build_app(settings: Settings | None = None, *, roles_dir: Path = Path("roles
         raise StartupError("APP_MODE=real is unavailable; use APP_MODE=mock.")
     if (settings.conversation_enabled or settings.scoring_enabled) and (not settings.anthropic_api_key or not settings.anthropic_api_key.get_secret_value().strip()):
         raise StartupError("Configure: ANTHROPIC_API_KEY")
-    if settings.avatar_mode != "mock" and not (settings.realtime_enabled and settings.tavus_enabled):
-        raise StartupError("APP_MODE=mock requires AVATAR_MODE=mock.")
+    if settings.avatar_mode == "svg" and not settings.realtime_enabled:
+        raise StartupError("AVATAR_MODE=svg requires REALTIME_ENABLED=true.")
+    if settings.avatar_mode not in ("mock", "svg") and not (settings.realtime_enabled and settings.tavus_enabled):
+        raise StartupError("APP_MODE=mock requires AVATAR_MODE=mock or AVATAR_MODE=svg.")
     if settings.tavus_enabled:
         missing_avatar = settings.missing_tavus_settings()
         if missing_avatar:
@@ -85,6 +87,7 @@ def build_app(settings: Settings | None = None, *, roles_dir: Path = Path("roles
     app.state.mock_notice = "Text interview demo."
     if settings.realtime_enabled:
         app.state.mock_notice = ("Demo with local Whisper/Piper audio and Tavus avatar enabled." if settings.tavus_enabled else
+                                 "Demo with local Whisper/Piper audio and SVG avatar enabled." if settings.avatar_mode == "svg" else
                                  "Demo with local Whisper/Piper audio; avatar not enabled.")
     if settings.conversation_enabled:
         app.state.mock_notice += " Claude interprets answers."
