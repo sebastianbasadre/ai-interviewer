@@ -25,7 +25,7 @@ def test_pm_po_role_has_reviewable_competencies_and_alternative_questions():
         assert {anchor.score for anchor in competency.anchors} == {1, 3, 5}
         for question in competency.questions:
             assert question.followup_criteria
-            assert any("caso" in criterion or "ejemplo" in criterion for criterion in question.followup_criteria)
+            assert any("case" in criterion or "example" in criterion for criterion in question.followup_criteria)
 
 
 def test_unknown_company_information_is_not_invented():

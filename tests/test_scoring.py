@@ -40,7 +40,7 @@ async def test_three_runs_median_dispersion_and_real_citations():
     assert "scoring_dispersion" in report.flags
     assert all(score.evidence_turn_ids == [turn.id] for score, turn in zip(report.scores, turns))
     assert "recommendation" in report.recommendation.casefold()
-    assert "estado civil" in model.calls[0][0] and "apariencia" in model.calls[0][0]
+    assert "marital status" in model.calls[0][0] and "appearance" in model.calls[0][0]
     assert str(turns[0].id) in render_markdown(report, turns)
 
 

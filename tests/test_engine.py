@@ -63,8 +63,8 @@ async def test_mock_demo_advances_after_one_followup_even_after_restore():
 async def test_deterministic_complete_phases_and_all_six_competencies():
     engine = StructuredInterviewEngine(analyzer=Concrete(), now=lambda: NOW)
     decision = await engine.start(ROLE, CANDIDATE)
-    assert "Soy un entrevistador de IA" in decision.text
-    assert "se graba" in decision.text
+    assert "I am an AI interviewer" in decision.text
+    assert "recorded as a transcript" in decision.text
     phases = [decision.state.phase]
     await engine.on_candidate_turn(answer(engine, "Sí"))
     phases.append(engine.state.phase)
@@ -124,7 +124,7 @@ async def test_company_unknowns_are_deferred_and_question_loop_is_bounded():
     for _ in range(6): await engine.on_candidate_turn(answer(engine))
     for text in ["¿Cuál es el salario?", "¿Y los beneficios?"]:
         decision = await engine.on_candidate_turn(answer(engine, text))
-        assert "equipo humano" in decision.text
+        assert "The team will answer" in decision.text
     decision = await engine.on_candidate_turn(answer(engine, "¿Dónde queda la oficina?"))
     assert decision.state.phase == InterviewPhase.CLOSING
 
@@ -191,7 +191,7 @@ async def test_llm_adapters_send_bounded_sanitized_data_and_validate_schema():
     analyzer = LLMAnswerAnalyzer(model)
     result = await analyzer.analyze("Tengo 42 años. Cambié el flujo.", "Pregunta profesional")
     assert result.concrete_example and "42" not in model.calls[0][1]
-    assert "apariencia" in model.calls[0][0]
+    assert "appearance" in model.calls[0][0]
     class WriterModel:
         async def complete(self, system, user): return '{"text":"Pregunta aprobada"}'
     assert await LLMQuestionWriter(WriterModel()).write("Pregunta aprobada", "competencies", "discovery") == "Pregunta aprobada"
@@ -204,8 +204,8 @@ async def test_missing_result_analysis_requests_star_instead_of_advancing():
         def __init__(self): self.calls = []
         async def complete(self, system, user):
             self.calls.append((system, user))
-            assert "resultado o aprendizaje explícito" in system
-            assert "no infieras resultados" in system
+            assert "explicit outcome or learning" in system
+            assert "do not infer outcomes" in system
             return '{"concrete_example":false,"on_topic":true,"request":"answer","injection_attempt":false}'
     model = MissingResultModel()
     engine = StructuredInterviewEngine(analyzer=LLMAnswerAnalyzer(model), now=lambda: NOW)
@@ -215,7 +215,8 @@ async def test_missing_result_analysis_requests_star_instead_of_advancing():
     assert decision.state.competency_index == 0
     assert decision.state.followup_count == 1
     assert "star_followup" in decision.flags
-    assert "resultado o aprendizaje" in decision.text
+    assert "analysis_fallback" not in decision.flags
+    assert "outcome or learning" in decision.text
 
 
 async def test_followup_result_completes_original_example_after_restore():
@@ -232,7 +233,7 @@ async def test_followup_result_completes_original_example_after_restore():
     engine = StructuredInterviewEngine(analyzer=LLMAnswerAnalyzer(model), now=lambda: NOW)
     initial = await at_competency(engine)
     followup = await engine.on_candidate_turn(answer(engine, "En el proyecto de pagos entrevisté usuarios y cambié el flujo."))
-    assert "resultado concreto" in followup.text
+    assert "specific outcome" in followup.text
     snapshot = SessionSnapshot(interview_id=uuid4(), state=engine.state,
                                deadline=NOW+timedelta(minutes=30), updated_at=NOW)
     resumed = StructuredInterviewEngine(analyzer=LLMAnswerAnalyzer(model), now=lambda: NOW)
@@ -265,9 +266,9 @@ async def test_context_first_starts_with_professional_context():
     engine = StructuredInterviewEngine(context_first=True, now=lambda: NOW)
     first = await engine.start(ROLE, CANDIDATE)
     assert first.state.phase == InterviewPhase.WARMUP
-    assert "contexto profesional" in first.text
-    assert "Soy un entrevistador de IA" in first.text
-    assert "¿Podemos empezar?" not in first.text
+    assert "professional background" in first.text
+    assert "I am an AI interviewer" in first.text
+    assert "Shall we start?" not in first.text
     following = await engine.on_candidate_turn(answer(engine, "Soy director de producto"))
     assert following.state.phase == InterviewPhase.COMPETENCIES
     assert following.state.competency_index == 0
