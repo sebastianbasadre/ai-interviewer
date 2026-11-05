@@ -124,7 +124,7 @@ def test_conversation_model_interprets_followups_while_scoring_remains_mock(tmp_
             assert client.post(session + "/turn", json={"text": text}).status_code == 200
         assert not calls
         followup = client.post(session + "/turn", json={"text": "En el proyecto de pagos entrevisté usuarios y cambié el flujo."}).json()
-        assert "resultado concreto" in followup["text"]
+        assert "specific outcome" in followup["text"]
         advanced = client.post(session + "/turn", json={"text": "Los errores bajaron un 20%."}).json()
         assert advanced["state"]["competency_index"] == 1
         assert len(calls) == 2 and "Synthetic" not in calls[0]

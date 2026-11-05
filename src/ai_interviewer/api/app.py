@@ -88,7 +88,7 @@ def create_app(
     if origin.scheme not in {"http", "https"} or not origin.hostname or origin.path not in {"", "/"} or origin.query or origin.fragment or origin.username:
         raise ValueError("PUBLIC_BASE_URL must be an origin without credentials or path")
     mock_lan_http = False
-    if settings.allow_mock_lan_http and settings.app_mode == "mock" and settings.avatar_mode == "mock":
+    if settings.allow_mock_lan_http and settings.app_mode == "mock" and settings.avatar_mode in {"mock", "svg"}:
         try:
             address = ip_address(origin.hostname)
             mock_lan_http = any(address in ip_network(network) for network in
@@ -388,7 +388,7 @@ def create_app(
                 raise
             response = JSONResponse({"id": str(interview.id), "decision": decision.model_dump(mode="json")})
             if not decision.end_session:
-                response.set_cookie(cookie_name(interview.id), key, max_age=(settings.interview_max_minutes + 60) * 60, httponly=True, secure=origin.scheme == "https", samesite="strict", path="/")
+                response.set_cookie(cookie_name(interview.id), key, max_age=(settings.interview_max_minutes + 60) * 60, httponly=True, secure=origin.scheme == "https", samesite="lax", path="/")
             return response
 
     @app.post("/session/{interview_id}/turn")

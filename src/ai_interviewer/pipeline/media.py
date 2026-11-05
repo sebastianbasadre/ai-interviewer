@@ -7,9 +7,13 @@ requested. Media is transient; only the existing text transcript is persisted.
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from time import time
 from typing import Awaitable, Callable
 from uuid import UUID
 
@@ -65,8 +69,17 @@ class MediaManager:
         async with self._lock:
             if self.peers:
                 raise MediaUnavailable("An audio connection is already active. Disconnect it before retrying.")
-            from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
-            connection = SmallWebRTCConnection(connection_timeout_secs=20)
+            from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection, IceServer
+            ice_servers: list[IceServer] = []
+            if self.settings.turn_url and self.settings.turn_shared_secret:
+                turn_user = str(int(time()) + 3600) + ":" + interview_id.hex
+                turn_cred = base64.b64encode(
+                    hmac.new(self.settings.turn_shared_secret.get_secret_value().encode(),
+                             turn_user.encode(), hashlib.sha1).digest()
+                ).decode()
+                ice_servers = [IceServer(urls=self.settings.turn_url,
+                                         username=turn_user, credential=turn_cred)]
+            connection = SmallWebRTCConnection(connection_timeout_secs=20, ice_servers=ice_servers)
             peer = LivePeer(connection)
             self.peers[interview_id] = peer
             try:
@@ -129,6 +142,7 @@ class MediaManager:
                         decision = await submit(frame.text)
                         peer.connection.send_app_message({"type": "interview-turn", "candidate": frame.text, "decision": decision})
                         if decision["text"]:
+                            last_spoken[0] = decision["text"]
                             await self.push_frame(TTSSpeakFrame(text=decision["text"]))
                         if decision["end_session"]:
                             await peer.worker.stop_when_done()
@@ -175,13 +189,23 @@ class MediaManager:
                 peer.runner = runner
                 await runner.add_workers(worker)
 
+                last_spoken = [initial_text]
+
                 @transport.event_handler("on_client_connected")
                 async def connected(transport, client):
                     avatar_type = ("tavus" if self.settings.tavus_enabled
                                    else "svg" if self.settings.avatar_mode == "svg"
                                    else None)
                     peer.connection.send_app_message({"type": "media-ready", "avatar": avatar_type})
+                    # Delay TTS slightly so the browser track event fires first.
+                    await asyncio.sleep(0.5)
                     await worker.queue_frame(TTSSpeakFrame(text=initial_text))
+
+                @transport.event_handler("on_app_message")
+                async def on_app_message(transport, message, sender):
+                    # Browser signals that its audio element is now playing.
+                    if isinstance(message, dict) and message.get("type") == "audio-ready":
+                        await worker.queue_frame(TTSSpeakFrame(text=last_spoken[0]))
 
                 @transport.event_handler("on_client_disconnected")
                 async def disconnected(transport, client):
