@@ -7,9 +7,13 @@ requested. Media is transient; only the existing text transcript is persisted.
 from __future__ import annotations
 
 import asyncio
+import base64
+import hashlib
+import hmac
 from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from time import time
 from typing import Awaitable, Callable
 from uuid import UUID
 
@@ -65,8 +69,17 @@ class MediaManager:
         async with self._lock:
             if self.peers:
                 raise MediaUnavailable("An audio connection is already active. Disconnect it before retrying.")
-            from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection
-            connection = SmallWebRTCConnection(connection_timeout_secs=20)
+            from pipecat.transports.smallwebrtc.connection import SmallWebRTCConnection, IceServer
+            ice_servers: list[IceServer] = []
+            if self.settings.turn_url and self.settings.turn_shared_secret:
+                turn_user = str(int(time()) + 3600) + ":" + interview_id.hex
+                turn_cred = base64.b64encode(
+                    hmac.new(self.settings.turn_shared_secret.get_secret_value().encode(),
+                             turn_user.encode(), hashlib.sha1).digest()
+                ).decode()
+                ice_servers = [IceServer(urls=self.settings.turn_url,
+                                         username=turn_user, credential=turn_cred)]
+            connection = SmallWebRTCConnection(connection_timeout_secs=20, ice_servers=ice_servers)
             peer = LivePeer(connection)
             self.peers[interview_id] = peer
             try:
